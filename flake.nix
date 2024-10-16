@@ -12,6 +12,7 @@
   #     $ nix flake lock --update-input <input> ... --commit-lockfile
   #
   inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # Convenience functions for writing flakes
     flake-utils.url = "github:numtide/flake-utils";
     # Precisely filter files copied to the nix store
@@ -28,6 +29,10 @@
         ocamlPackages = legacyPackages.ocamlPackages;
         # Library functions from nixpkgs
         lib = legacyPackages.lib;
+        systems = [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
+        forAllSystems = f: builtins.listToAttrs (map (name: { inherit name; value = f name; }) systems);
+        merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix {};
+        libressl = legacyPackages.callPackage ./deps/libressl.nix {};
 
         # Filtered sources (prevents unecessary rebuilds)
         sources = {
@@ -63,26 +68,33 @@
           #     $ nix build
           #     $ nix run -- <args?>
           #
-          default = self.packages.${system}.relational_engine;
+            default = self.packages.${system}.relational_engine;
+          
+            relational_engine = ocamlPackages.buildDunePackage {
+              pname = "relational_engine";
+              version = "0.1.0";
+              duneVersion = "3";
+              src = sources.ocaml;
 
-          relational_engine = ocamlPackages.buildDunePackage {
-            pname = "relational_engine";
-            version = "0.1.0";
-            duneVersion = "3";
-            src = sources.ocaml;
+              env = {
+                MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
+                LIBRESSL_INCLUDE_PATH="${libressl}/include";
+                LIBRESSL_LIB_PATH="${libressl}/lib";
+              };
 
-            buildInputs = [
-              # Ocaml package dependencies needed to build go here.
-            ];
+              nativeInputs = [];
 
-            strictDeps = true;
+              buildInputs = [
+                # Ocaml package dependencies needed to build go here.
+              ];
 
-            preBuild = ''
-              dune build relational_engine.opam
-            '';
+              strictDeps = true;
+
+              preBuild = ''
+                dune build relational_engine.opam
+              '';
+            };
           };
-        };
-
         # Flake checks
         #
         #     $ nix flake check
@@ -204,7 +216,8 @@
               ocamlPackages.utop
               # Libraries
               ocamlPackages.menhir
-              ocamlPackages.batteries
+              ocamlPackages.ctypes
+              ocamlPackages.ctypes-foreign
             ];
 
             # Tools from packages

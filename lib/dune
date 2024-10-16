@@ -1,2 +1,10 @@
 (library
- (name relational_engine))
+ (name relational_engine)
+ (foreign_stubs
+  (language cxx)
+  (names merklecpp_stubs)
+  (flags
+   (:standard -lssl -lcrypto)
+   (-L %{env:LIBRESSL_LIB_PATH=})
+   (-I %{env:LIBRESSL_INCLUDE_PATH=})
+   (-I %{env:MERKLECPP_INCLUDE_PATH=}))))

@@ -1,1 +1,3 @@
-let () = print_endline "Hello, World!"
+open Relational_engine.Hello
+
+let _ = hello ()
