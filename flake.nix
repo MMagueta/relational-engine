@@ -202,6 +202,8 @@
                 MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
                 LIBRESSL_INCLUDE_PATH="${libressl}/include";
                 LIBRESSL_LIB_PATH="${libressl}/lib";
+                CAML_INCLUDE_PATH="${legacyPackages.ocaml}/include";
+                OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
             };
             
             # Development tools
