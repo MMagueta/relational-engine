@@ -1,0 +1,24 @@
+#+TITLE: Relational Engine
+
+* About
+This is a relational engine.
+
+* Roadmap
+- [ ] Filesystem [0/6]
+  - [ ] Durability
+  - [ ] Immutable storage
+  - [ ] ARIES
+  - [ ] Merkle construction per virtual file
+  - [ ] Branching
+  - [ ] Branch merge strategies [0/3]
+    - [ ] Selected merge
+    - [ ] Union merge
+    - [ ] Biased union merge
+- [ ] Language [0/4]
+  - [ ] Lexer
+  - [ ] Parser
+  - [ ] AST
+  - [ ] Unification and query terms
+- [ ] Server [0/2]
+  - [ ] Authentication
+  - [ ] Multi-client coordination

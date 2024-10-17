@@ -1,3 +1,15 @@
-open Relational_engine.Disk
+open Relational_engine
 
-let () = print_int (Command.writer Command.StringMap.empty Command.StringMap.empty "" "" (Bytes.of_string "trash"))
+module Implementations = struct
+  open Ctypes
+  let compute_hash content =
+    let size_with_null_terminator = C.Types.hash_size + 1 in
+    let buf = Ctypes.allocate_n char ~count:size_with_null_terminator in
+    let _ = C.Functions.compute_hash buf content in
+    Ctypes.coerce (ptr char) Ctypes.string buf
+end
+
+let () =
+  begin
+    print_endline (Implementations.compute_hash "test")
+  end

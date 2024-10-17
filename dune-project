@@ -1,6 +1,6 @@
 (lang dune 3.16)
 
-;; (using ctypes 0.3)
+(using ctypes 0.3)
 
 (name relational_engine)
 

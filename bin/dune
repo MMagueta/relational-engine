@@ -1,5 +1,7 @@
 (executable
  (public_name relational_engine)
  (name main)
- (libraries relational_engine))
+ (libraries relational_engine)
+ ;; (flags (:standard -lmerklecpp_stub))
+ )
 
