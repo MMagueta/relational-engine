@@ -29,8 +29,6 @@
         ocamlPackages = legacyPackages.ocamlPackages;
         # Library functions from nixpkgs
         lib = legacyPackages.lib;
-        systems = [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
-        forAllSystems = f: builtins.listToAttrs (map (name: { inherit name; value = f name; }) systems);
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix {};
         libressl = legacyPackages.callPackage ./deps/libressl.nix {};
 
@@ -199,6 +197,13 @@
         #
         devShells = {
           default = legacyPackages.mkShell {
+
+            env = {
+                MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
+                LIBRESSL_INCLUDE_PATH="${libressl}/include";
+                LIBRESSL_LIB_PATH="${libressl}/lib";
+            };
+            
             # Development tools
             packages = [
               # Source file formatting

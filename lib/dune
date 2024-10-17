@@ -1,10 +1,31 @@
 (library
  (name relational_engine)
- (foreign_stubs
-  (language cxx)
-  (names merklecpp_stubs)
-  (flags
-   (:standard -lssl -lcrypto)
-   (-L %{env:LIBRESSL_LIB_PATH=})
-   (-I %{env:LIBRESSL_INCLUDE_PATH=})
-   (-I %{env:MERKLECPP_INCLUDE_PATH=}))))
+ (libraries ctypes ctypes-foreign)
+ (modes native)
+  (foreign_stubs
+   (language cxx)
+   (names merklecpp_stubs)
+   (flags
+    (:standard -lssl -lcrypto)
+    (-L %{env:LIBRESSL_LIB_PATH=})
+    (-I %{env:LIBRESSL_INCLUDE_PATH=})
+    (-I %{env:MERKLECPP_INCLUDE_PATH=})))
+  
+  ;; (ctypes
+  ;; (external_library_name merklecpp_stub)
+  ;; (headers (include "/Users/mmagueta/CLionProjects/merklecpp_stub/library.h"))
+  ;; (build_flags_resolver
+  ;;  (vendored
+  ;;   (c_flags
+  ;;     -L %{env:MERKLECPP_LIB_PATH=})))
+  ;; (type_description
+  ;;  (instance Types)
+  ;;  (functor Type_description))
+  ;; (function_description
+  ;;  (concurrency unlocked)
+  ;;  (instance Functions)
+  ;;  (functor Function_description))
+  ;; (generated_types Types_generated)
+  ;; (generated_entry_point C))
+
+  )
