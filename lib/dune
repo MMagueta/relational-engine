@@ -20,10 +20,10 @@
      -L %{env:LIBRELATIONAL_ENGINE_LIB_PATH=})))
   (type_description
    (instance Types)
-   (functor merklecpp_types))
+   (functor core_types))
   (function_description
    (concurrency unlocked)
    (instance Functions)
-   (functor merklecpp_functions))
+   (functor core_functions))
   (generated_types Types_generated)
   (generated_entry_point C)))

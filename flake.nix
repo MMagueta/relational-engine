@@ -236,6 +236,15 @@
               legacyPackages.gcc
             ];
 
+            shellHook = ''
+                echo MERKLECPP_INCLUDE_PATH=$MERKLECPP_INCLUDE_PATH
+                echo LIBRESSL_INCLUDE_PATH=$LIBRESSL_INCLUDE_PATH
+                echo LIBRESSL_LIB_PATH=$LIBRESSL_LIB_PATH
+                echo OS_LIB_EXTENSION=$OS_LIB_EXTENSION 
+                echo LIBRELATIONAL_ENGINE_LIB_PATH=$LIBRELATIONAL_ENGINE_LIB_PATH
+                echo LIBRELATIONAL_ENGINE_INCLUDE_PATH=$LIBRELATIONAL_ENGINE_INCLUDE_PATH
+            '';
+
             # Tools from packages
             inputsFrom = [
               self.packages.${system}.relational_engine

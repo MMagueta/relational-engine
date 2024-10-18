@@ -17,5 +17,6 @@ end
 let () =
   begin
     print_endline (Implementations.compute_hash "test");
-    print_endline (Implementations.gethostname ())
+    print_endline (Implementations.gethostname ());
+    print_endline C.Functions.os_extension
   end
