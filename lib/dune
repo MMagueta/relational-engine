@@ -12,12 +12,12 @@
  ;;   (-I %{env:MERKLECPP_INCLUDE_PATH=})))
  
  (ctypes
-  (external_library_name merklecpp_stub)
-  (headers (include "/Users/mmagueta/CLionProjects/merklecpp_stub/library.h"))
+  (external_library_name relational_engine)
+  (headers (include %{env:LIBRELATIONAL_ENGINE_INCLUDE_PATH=}/library.h))
   (build_flags_resolver
    (vendored
     (c_flags
-     -L %{env:MERKLECPP_LIB_PATH=})))
+     -L %{env:LIBRELATIONAL_ENGINE_LIB_PATH=})))
   (type_description
    (instance Types)
    (functor merklecpp_types))

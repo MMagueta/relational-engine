@@ -31,6 +31,7 @@
         lib = legacyPackages.lib;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix {};
         libressl = legacyPackages.callPackage ./deps/libressl.nix {};
+        librelational_engine = legacyPackages.callPackage ./deps/relational_engine_lib.nix { libressl = libressl; merklecpp = merklecpp; };
 
         # Filtered sources (prevents unecessary rebuilds)
         sources = {
@@ -78,11 +79,16 @@
                 MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
                 LIBRESSL_INCLUDE_PATH="${libressl}/include";
                 LIBRESSL_LIB_PATH="${libressl}/lib";
+                OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
+                LIBRELATIONAL_ENGINE_LIB_PATH="${librelational_engine}/lib";
+                LIBRELATIONAL_ENGINE_INCLUDE_PATH="${librelational_engine}/include";
               };
 
               nativeInputs = [];
 
               buildInputs = [
+                ocamlPackages.ctypes
+                ocamlPackages.ctypes-foreign
                 # Ocaml package dependencies needed to build go here.
               ];
 
@@ -202,8 +208,9 @@
                 MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
                 LIBRESSL_INCLUDE_PATH="${libressl}/include";
                 LIBRESSL_LIB_PATH="${libressl}/lib";
-                CAML_INCLUDE_PATH="${legacyPackages.ocaml}/include";
                 OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
+                LIBRELATIONAL_ENGINE_LIB_PATH="${librelational_engine}/lib";
+                LIBRELATIONAL_ENGINE_INCLUDE_PATH="${librelational_engine}/include";
             };
             
             # Development tools
@@ -225,6 +232,8 @@
               ocamlPackages.menhir
               ocamlPackages.ctypes
               ocamlPackages.ctypes-foreign
+              legacyPackages.cmake
+              legacyPackages.gcc
             ];
 
             # Tools from packages
