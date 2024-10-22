@@ -1,5 +1,5 @@
 {
-  description = "A compiler for a statically-typed relational programming language";
+  description = "Relational Engine";
 
   # Flake dependency specification
   #
