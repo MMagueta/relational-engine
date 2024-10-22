@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.29)
 project(relational_engine)
 
-set(CMAKE_CXX_STANDARD 26)
-
 include_directories($ENV{LIBRESSL_INCLUDE_PATH})
 include_directories($ENV{MERKLECPP_INCLUDE_PATH})
 
