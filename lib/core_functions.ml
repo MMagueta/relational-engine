@@ -16,6 +16,6 @@ module Functions (F : Ctypes.FOREIGN) = struct
     else "dll"
   let libmerklecpp = Dl.dlopen ~flags:[RTLD_GLOBAL; RTLD_NOW] ~filename:((Sys.getenv "LIBRELATIONAL_ENGINE_LIB_PATH") ^ "/librelational_engine." ^ os_extension)
   let compute_hash = Foreign.foreign ~from:libmerklecpp "compute_hash" (ptr char @-> Ctypes.string @-> returning void)
+  let merkle_generate_root = Foreign.foreign ~from:libmerklecpp "merkle_generate_root" (ptr Ctypes.string @-> int @-> ptr char @-> returning void)
 
-  let get_host_name_c = Foreign.foreign "gethostname" (ptr char @-> int @-> returning int)
 end

@@ -4,10 +4,14 @@
 #include <iomanip>
 extern "C" {
 #include "library.h"
-    extern void hello() {
-        std::cout << "Hello, World!" << std::endl;
+    extern void merkle_generate_root(char** hashes, const int n, char* root) {
+        merkle::Tree tree;
+        for (int i = 0; i < n; i++){
+            tree.insert(merkle::Hash(hashes[i]));
+        }
+        std::memcpy(root, tree.root().to_string().c_str(), HASH_SIZE);
     }
-    extern void compute_hash(char* computed_hash, char *content) {
+    extern void compute_hash(char* computed_hash, const char *content) {
 
         unsigned char hash[SHA256_DIGEST_LENGTH];
         SHA256_CTX sha256;
