@@ -1,6 +1,6 @@
 (library
  (name relational_engine)
- (libraries ctypes ctypes-foreign)
+ (libraries ctypes ctypes-foreign data-encoding)
  ;; (c_library_flags -lssl -lcrypto -L %{env:LIBRESSL_LIB_PATH=})
  ;; (foreign_stubs
  ;;  (language cxx)

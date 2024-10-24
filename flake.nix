@@ -86,10 +86,10 @@
 
               nativeInputs = [];
 
-              buildInputs = [
-                ocamlPackages.ctypes
-                ocamlPackages.ctypes-foreign
-                # Ocaml package dependencies needed to build go here.
+              buildInputs = with ocamlPackages; [
+                ctypes
+                ctypes-foreign
+                data-encoding
               ];
 
               strictDeps = true;
@@ -232,6 +232,7 @@
               ocamlPackages.menhir
               ocamlPackages.ctypes
               ocamlPackages.ctypes-foreign
+              ocamlPackages.data-encoding
               legacyPackages.cmake
               legacyPackages.gcc
             ];
