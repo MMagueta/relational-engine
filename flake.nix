@@ -1,5 +1,5 @@
 {
-  description = "A compiler for a statically-typed relational programming language";
+  description = "Relational Engine";
 
   # Flake dependency specification
   #
@@ -31,6 +31,7 @@
         lib = legacyPackages.lib;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix {};
         libressl = legacyPackages.callPackage ./deps/libressl.nix {};
+        librelational_engine = legacyPackages.callPackage ./deps/relational_engine_lib.nix { libressl = libressl; merklecpp = merklecpp; };
 
         # Filtered sources (prevents unecessary rebuilds)
         sources = {
@@ -78,12 +79,17 @@
                 MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
                 LIBRESSL_INCLUDE_PATH="${libressl}/include";
                 LIBRESSL_LIB_PATH="${libressl}/lib";
+                OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
+                LIBRELATIONAL_ENGINE_LIB_PATH="${librelational_engine}/lib";
+                LIBRELATIONAL_ENGINE_INCLUDE_PATH="${librelational_engine}/include";
               };
 
               nativeInputs = [];
 
-              buildInputs = [
-                # Ocaml package dependencies needed to build go here.
+              buildInputs = with ocamlPackages; [
+                ctypes
+                ctypes-foreign
+                data-encoding
               ];
 
               strictDeps = true;
@@ -202,8 +208,9 @@
                 MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
                 LIBRESSL_INCLUDE_PATH="${libressl}/include";
                 LIBRESSL_LIB_PATH="${libressl}/lib";
-                CAML_INCLUDE_PATH="${legacyPackages.ocaml}/include";
                 OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
+                LIBRELATIONAL_ENGINE_LIB_PATH="${librelational_engine}/lib";
+                LIBRELATIONAL_ENGINE_INCLUDE_PATH="${librelational_engine}/include";
             };
             
             # Development tools
@@ -225,7 +232,19 @@
               ocamlPackages.menhir
               ocamlPackages.ctypes
               ocamlPackages.ctypes-foreign
+              ocamlPackages.data-encoding
+              legacyPackages.cmake
+              legacyPackages.gcc
             ];
+
+            shellHook = ''
+                echo MERKLECPP_INCLUDE_PATH=$MERKLECPP_INCLUDE_PATH
+                echo LIBRESSL_INCLUDE_PATH=$LIBRESSL_INCLUDE_PATH
+                echo LIBRESSL_LIB_PATH=$LIBRESSL_LIB_PATH
+                echo OS_LIB_EXTENSION=$OS_LIB_EXTENSION 
+                echo LIBRELATIONAL_ENGINE_LIB_PATH=$LIBRELATIONAL_ENGINE_LIB_PATH
+                echo LIBRELATIONAL_ENGINE_INCLUDE_PATH=$LIBRELATIONAL_ENGINE_INCLUDE_PATH
+            '';
 
             # Tools from packages
             inputsFrom = [
