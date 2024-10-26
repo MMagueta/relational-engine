@@ -1,34 +1,54 @@
-module Interop = struct
-  open Ctypes
-  module Sha256 = struct
-    let compute_hash content =
-      let size_with_null_terminator = C.Types.hash_size + 1 in
-      let buf = Ctypes.allocate_n char ~count:size_with_null_terminator in
-      let () = C.Functions.compute_hash buf (Bytes.to_string content) in
-      Ctypes.coerce (ptr char) Ctypes.string buf
-  end
-  module Merkle = struct
-    let merkle_generate_root hashes =
-      let size_with_null_terminator = C.Types.hash_size + 1 in
-      let buf = Ctypes.allocate_n char ~count:size_with_null_terminator in
-      let len = List.length hashes in
-      let hashes = CArray.of_list string hashes in
-      C.Functions.merkle_generate_root (CArray.start hashes) len buf;
-      Ctypes.coerce (ptr char) Ctypes.string buf
-  end
+module type Configuration = sig
+  val base_dir: string
+  val storage: string
+  val transactions: string
+  val assure: unit -> unit
 end
 
-module Extensions = struct
-  module Option = struct
-    let ( let+ ) = Option.bind
-  end
-  module Result = struct
-    let ( let+ ) = Result.bind
-  end
+module DevelopmentConfiguration: Configuration = struct
+  let base_dir = "/tmp/relational-engine/"
+  let storage = base_dir ^ "storage/"
+  let transactions = base_dir ^ "transactions/"
+  let assure () =
+    if Sys.file_exists base_dir
+    then Sys.remove base_dir;
+    Sys.mkdir base_dir 0o700;
+    Sys.mkdir storage 0o700;
+    Sys.mkdir transactions 0o700;
 end
 
-module Filesystem = struct
+module type FileSystem = sig
+  type target =
+    | Storage
+    | Transaction
+  val append: target -> bytes -> (int*int64, string) result
+end
+
+module FileSystem (C: Configuration): FileSystem = struct
+  type target =
+    | Storage
+    | Transaction
+  let target_to_string = function
+    | Storage -> "storage"
+    | Transaction -> "transaction"
+
+  (** [append target content] writes content to file in append only format, returning [content_length * offset_written] *)
+  let append target content =
+    let register channel =
+      let offset_written = Out_channel.length channel in
+      Out_channel.seek channel offset_written;
+      Out_channel.output_bytes channel content;
+      Out_channel.flush channel;
+      Out_channel.close channel;
+      Ok (Bytes.length content, offset_written)
+    in
+    try Out_channel.with_open_bin (target_to_string target) register
+    with _ -> Error (Printf.sprintf "Error on appending to target '%s'" (target_to_string target))
+end
+
+module Executor = struct
   module StringMap = Map.Make(String)
+  module FS = FileSystem(DevelopmentConfiguration)
   module Location = struct
     type t =
       { offset: int64;
@@ -41,28 +61,14 @@ module Filesystem = struct
   type files = Hashes.t StringMap.t
   type locations = Location.t StringMap.t
   let _EMPTY_SHA_HASH_ = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  let _STORAGE_PATH_ = ""
-  (* Initializes the virtual file or opens it. *)
-  let assure_storage () =
-    if Sys.file_exists "/tmp/relational-engine"
-    then ()
-    else Sys.mkdir "/tmp/relational-engine" 0o700
-  let init (files: Hashes.t StringMap.t) filename: Hashes.t StringMap.t =
-    assure_storage();
+
+  (** Initializes the virtual file or opens it. *)
+  let init_file (files: Hashes.t StringMap.t) filename: Hashes.t StringMap.t =
     match StringMap.find_opt filename files with
     | None -> StringMap.add filename [_EMPTY_SHA_HASH_] files
     | Some _ -> files
   let write (files: files) (locations: locations) filename ?hash_to_replace (content: Bytes.t) =
-    let files = init files filename in
-    let write_to_disk content =
-      let channel = Out_channel.open_bin "/tmp/relational-engine/storage" in
-      let offset_written = Out_channel.length channel in
-      Out_channel.seek channel offset_written;
-      Out_channel.output_bytes channel content;
-      Out_channel.flush channel;
-      Out_channel.close channel;
-      (Bytes.length content, offset_written)
-    in
+    let files = init_file files filename in
     let computed_hash: string = Interop.Sha256.compute_hash content in
     match StringMap.find_opt computed_hash locations with
     | None ->
@@ -76,40 +82,39 @@ module Filesystem = struct
                 (function Some file_hashes -> Some (computed_hash::file_hashes) | None -> Some [computed_hash])
                 files
             in
-            let (size, offset) = write_to_disk content in
+            let open Extensions.Result in
+            let+ (size, offset) = FS.append Storage content in
             let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
-            (files, locations)
+            Ok (files, locations)
           end
         | Some hash_to_replace ->
-          let files = StringMap.update filename (function Some file_hashes -> Some (List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) file_hashes) | None -> Some [computed_hash]) files in
-          let (size, offset) = write_to_disk content in
-          let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
-          (files, locations)
+           let files = StringMap.update filename (function Some file_hashes -> Some (List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) file_hashes) | None -> Some [computed_hash]) files in
+           let open Extensions.Result in
+           let+ (size, offset) = FS.append Storage content in
+           let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
+           Ok (files, locations)
         end
     | Some _ ->
         begin match hash_to_replace with
         | Some hash_to_replace ->
-          let files = StringMap.update filename (function Some file_hashes -> Some (List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) file_hashes) | None -> Some [computed_hash]) files in
-          (files, locations)
+           let files =
+             StringMap.update filename
+               (function
+                | Some file_hashes -> Some (List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) file_hashes)
+                | None -> Some [computed_hash])
+               files in
+           Ok (files, locations)
         | None ->
-          (files, locations)
+           Ok (files, locations)
         end
-    module Transaction = struct
-      let log_command command =
-        assure_storage();
-        try let register channel = 
-              let offset_written = Out_channel.length channel in
-              Out_channel.seek channel offset_written;
-              Out_channel.output_bytes channel command;
-              Out_channel.flush channel;
-              Ok ()
-            in
-            Out_channel.with_open_bin "/tmp/relational-engine/transactions" register
-        with _ -> Error "Failed to log command to transaction graph."
-    end
+end
+
+module Startup = struct
+  let () = DevelopmentConfiguration.assure()
 end
 
 module Command = struct
+  module FS = FileSystem(DevelopmentConfiguration)
   open Data_encoding
   type command_kind =
     | OPEN
@@ -155,9 +160,8 @@ module Command = struct
     (* (_files: Filesystem.files) (_locations: Filesystem.locations)  *)
    command =
       let open Extensions.Result in
-      let+ serialized_command = 
+      let+ serialized_command =
         Result.map_error (fun _ -> "Failed to serialize command to binary format.")
         @@ Binary.to_bytes command_encoding command in
-      Filesystem.Transaction.log_command serialized_command
-  
+      FS.append FS.Transaction serialized_command
 end
