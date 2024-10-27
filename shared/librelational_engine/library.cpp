@@ -2,8 +2,51 @@
 #include <merklecpp.h>
 #include <openssl/sha.h>
 #include <iomanip>
+#include <fstream>
+#include <iterator>
+
+#include <sys/stat.h>
+
+std::vector<uint8_t> read_tree(const char* tree_path) {
+    std::ifstream file(tree_path, std::ios::binary);
+    file.unsetf(std::ios::skipws);
+    file.seekg(0, std::ios::end);
+    const std::streampos file_size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> v;
+    v.reserve(file_size);
+    v.insert(v.begin(), std::istream_iterator<uint8_t>(file), std::istream_iterator<uint8_t>());
+    return v;
+}
+
+void write_tree(const char* tree_path, const std::vector<uint8_t>& serialized_tree) {
+    std::ofstream out(tree_path, std::ios::out | std::ios::binary);
+    out.write(reinterpret_cast<const char*>(serialized_tree.data()), serialized_tree.size());
+    out.close();
+}
+
 extern "C" {
 #include "library.h"
+    extern void register_to_merkle(const char* tree_path, const char* computed_hash) {
+        struct stat st;
+        if (stat(tree_path, &st) == 0) {
+            const std::vector<uint8_t> tree_bytes = read_tree(tree_path);
+            merkle::Tree tree;
+            tree.deserialise(tree_bytes);
+            const merkle::Tree::Hash hash(computed_hash);
+            tree.insert(hash);
+            std::vector<uint8_t> target;
+            tree.serialise(target);
+            write_tree(tree_path, target);
+        } else {
+            merkle::Tree::Hash hash(computed_hash);
+            merkle::Tree tree;
+            tree.insert(hash);
+            std::vector<uint8_t> target;
+            tree.serialise(target);
+            write_tree(tree_path, target);
+        }
+    }
     extern void merkle_generate_root(char** hashes, const int n, char* root) {
         merkle::Tree tree;
         for (int i = 0; i < n; i++){

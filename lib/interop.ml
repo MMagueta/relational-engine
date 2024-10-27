@@ -16,4 +16,7 @@ module Merkle = struct
     let hashes = CArray.of_list string hashes in
     C.Functions.merkle_generate_root (CArray.start hashes) len buf;
     Ctypes.coerce (ptr char) Ctypes.string buf
+
+  let register_to_merkle content =
+    C.Functions.register_to_merkle "/tmp/relational-engine/tree" content
 end
