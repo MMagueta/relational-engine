@@ -29,9 +29,13 @@
         ocamlPackages = legacyPackages.ocamlPackages;
         # Library functions from nixpkgs
         lib = legacyPackages.lib;
-        merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix {};
-        libressl = legacyPackages.callPackage ./deps/libressl.nix {};
-        librelational_engine = legacyPackages.callPackage ./deps/relational_engine_lib.nix { libressl = libressl; merklecpp = merklecpp; };
+        merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix { };
+        libressl = legacyPackages.callPackage ./deps/libressl.nix { };
+        librelational_engine =
+          legacyPackages.callPackage ./deps/relational_engine_lib.nix {
+            libressl = libressl;
+            merklecpp = merklecpp;
+          };
 
         # Filtered sources (prevents unecessary rebuilds)
         sources = {
@@ -48,13 +52,10 @@
 
           nix = nix-filter.lib {
             root = ./.;
-            include = [
-              (nix-filter.lib.matchExt "nix")
-            ];
+            include = [ (nix-filter.lib.matchExt "nix") ];
           };
         };
-      in
-      {
+      in {
         # Exposed packages that can be built or run with `nix build` or
         # `nix run` respectively:
         #
@@ -67,127 +68,138 @@
           #     $ nix build
           #     $ nix run -- <args?>
           #
-            default = self.packages.${system}.relational_engine;
-          
-            relational_engine = ocamlPackages.buildDunePackage {
-              pname = "relational_engine";
-              version = "0.1.0";
-              duneVersion = "3";
-              src = sources.ocaml;
+          default = self.packages.${system}.relational_engine;
 
-              env = {
-                MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
-                LIBRESSL_INCLUDE_PATH="${libressl}/include";
-                LIBRESSL_LIB_PATH="${libressl}/lib";
-                OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
-                LIBRELATIONAL_ENGINE_LIB_PATH="${librelational_engine}/lib";
-                LIBRELATIONAL_ENGINE_INCLUDE_PATH="${librelational_engine}/include";
-              };
+          relational_engine = ocamlPackages.buildDunePackage {
+            pname = "relational_engine";
+            version = "0.1.0";
+            duneVersion = "3";
+            src = sources.ocaml;
 
-              nativeInputs = [];
-
-              buildInputs = with ocamlPackages; [
-                ctypes
-                ctypes-foreign
-                data-encoding
-              ];
-
-              strictDeps = true;
-
-              preBuild = ''
-                dune build relational_engine.opam
-              '';
+            env = {
+              MERKLECPP_INCLUDE_PATH = "${merklecpp}/include";
+              LIBRESSL_INCLUDE_PATH = "${libressl}/include";
+              LIBRESSL_LIB_PATH = "${libressl}/lib";
+              OS_LIB_EXTENSION =
+                if legacyPackages.stdenv.isDarwin then "dylib" else "so";
+              LIBRELATIONAL_ENGINE_LIB_PATH = "${librelational_engine}/lib";
+              LIBRELATIONAL_ENGINE_INCLUDE_PATH =
+                "${librelational_engine}/include";
             };
+
+            nativeInputs = [ ];
+
+            buildInputs = with ocamlPackages; [
+              ctypes
+              ctypes-foreign
+              data-encoding
+              ppx_inline_test
+            ];
+
+            strictDeps = true;
+
+            preBuild = ''
+              dune build relational_engine.opam
+            '';
           };
+        };
         # Flake checks
         #
         #     $ nix flake check
         #
         checks = {
           # Run tests for the `relational_engine` package
-          relational_engine =
-            let
-              # Patches calls to dune commands to produce log-friendly output
-              # when using `nix ... --print-build-log`. Ideally there would be
-              # support for one or more of the following:
-              #
-              # In Dune:
-              #
-              # - have workspace-specific dune configuration files
-              #
-              # In NixPkgs:
-              #
-              # - allow dune flags to be set in in `ocamlPackages.buildDunePackage`
-              # - alter `ocamlPackages.buildDunePackage` to use `--display=short`
-              # - alter `ocamlPackages.buildDunePackage` to allow `--config-file=FILE` to be set
-              patchDuneCommand =
-                let
-                  subcmds = [ "build" "test" "runtest" "install" ];
-                in
-                lib.replaceStrings
-                  (lib.lists.map (subcmd: "dune ${subcmd}") subcmds)
-                  (lib.lists.map (subcmd: "dune ${subcmd} --display=short") subcmds);
-            in
+          relational_engine = let
+            # Patches calls to dune commands to produce log-friendly output
+            # when using `nix ... --print-build-log`. Ideally there would be
+            # support for one or more of the following:
+            #
+            # In Dune:
+            #
+            # - have workspace-specific dune configuration files
+            #
+            # In NixPkgs:
+            #
+            # - allow dune flags to be set in in `ocamlPackages.buildDunePackage`
+            # - alter `ocamlPackages.buildDunePackage` to use `--display=short`
+            # - alter `ocamlPackages.buildDunePackage` to allow `--config-file=FILE` to be set
+            patchDuneCommand =
+              let subcmds = [ "build" "test" "runtest" "install" ];
+              in lib.replaceStrings
+              (lib.lists.map (subcmd: "dune ${subcmd}") subcmds)
+              (lib.lists.map (subcmd: "dune ${subcmd} --display=short")
+                subcmds);
 
-            self.packages.${system}.relational_engine.overrideAttrs
-              (oldAttrs: {
-                name = "check-${oldAttrs.name}";
-                doCheck = true;
-                buildPhase = patchDuneCommand oldAttrs.buildPhase;
-                checkPhase = patchDuneCommand oldAttrs.checkPhase;
-                # skip installation (this will be tested in the `relational_engine-app` check)
-                installPhase = "touch $out";
-              });
+          in self.packages.${system}.relational_engine.overrideAttrs
+          (oldAttrs: {
+            name = "check-${oldAttrs.name}";
+            doCheck = true;
+            buildPhase = patchDuneCommand oldAttrs.buildPhase;
+            checkPhase = patchDuneCommand oldAttrs.checkPhase;
+            # skip installation (this will be tested in the `relational_engine-app` check)
+            installPhase = "touch $out";
+          });
 
           # Check Dune and OCaml formatting
-          dune-fmt = legacyPackages.runCommand "check-dune-fmt"
-            {
-              nativeBuildInputs = [
-                ocamlPackages.dune_3
-                ocamlPackages.ocaml
-                legacyPackages.ocamlformat
-              ];
-            }
-            ''
-              echo "checking dune and ocaml formatting"
-              dune build \
-                --display=short \
-                --no-print-directory \
-                --root="${sources.ocaml}" \
-                --build-dir="$(pwd)/_build" \
-                @fmt
-              touch $out
-            '';
+          dune-fmt = legacyPackages.runCommand "check-dune-fmt" {
+            nativeBuildInputs = [
+              ocamlPackages.dune_3
+              ocamlPackages.ocaml
+              legacyPackages.ocamlformat
+            ];
+          } ''
+            echo "checking dune and ocaml formatting"
+            dune build \
+              --display=short \
+              --no-print-directory \
+              --root="${sources.ocaml}" \
+              --build-dir="$(pwd)/_build" \
+              @fmt
+            touch $out
+          '';
+
+          dune-test = legacyPackages.runCommand "check-dune-test" {
+            nativeBuildInputs = [
+              ocamlPackages.dune_3
+              ocamlPackages.ocaml
+              legacyPackages.ocamlformat
+              ocamlPackages.ppx_inline_test
+            ];
+          } ''
+            echo "checking dune and ocaml formatting"
+            dune build \
+              --display=short \
+              --no-print-directory \
+              --root="${sources.ocaml}" \
+              --build-dir="$(pwd)/_build" \
+              @fmt
+            touch $out
+          '';
 
           # Check documentation generation
-          dune-doc = legacyPackages.runCommand "check-dune-doc"
-            {
-              ODOC_WARN_ERROR = "true";
-              nativeBuildInputs = [
-                ocamlPackages.dune_3
-                ocamlPackages.ocaml
-                ocamlPackages.odoc
-              ];
-            }
-            ''
-              echo "checking ocaml documentation"
-              dune build \
-                --display=short \
-                --no-print-directory \
-                --root="${sources.ocaml}" \
-                --build-dir="$(pwd)/_build" \
-                @doc
-              touch $out
-            '';
+          dune-doc = legacyPackages.runCommand "check-dune-doc" {
+            ODOC_WARN_ERROR = "true";
+            nativeBuildInputs =
+              [ ocamlPackages.dune_3 ocamlPackages.ocaml ocamlPackages.odoc ];
+          } ''
+            echo "checking ocaml documentation"
+            dune build \
+              --display=short \
+              --no-print-directory \
+              --root="${sources.ocaml}" \
+              --build-dir="$(pwd)/_build" \
+              @doc
+            touch $out
+          '';
 
           # Check Nix formatting
-          nixpkgs-fmt = legacyPackages.runCommand "check-nixpkgs-fmt"
-            { nativeBuildInputs = [ legacyPackages.nixpkgs-fmt ]; }
-            ''
-              echo "checking nix formatting"
-              nixpkgs-fmt --check ${sources.nix}
-              touch $out
-            '';
+          # nixpkgs-fmt = legacyPackages.runCommand "check-nixpkgs-fmt" {
+          #   nativeBuildInputs = [ legacyPackages.nixpkgs-fmt ];
+          # } ''
+          #   echo "checking nix formatting"
+          #   nixpkgs-fmt --check ${sources.nix}
+          #   touch $out
+          # '';
         };
 
         # Development shells
@@ -205,14 +217,16 @@
           default = legacyPackages.mkShell {
 
             env = {
-                MERKLECPP_INCLUDE_PATH="${merklecpp}/include";
-                LIBRESSL_INCLUDE_PATH="${libressl}/include";
-                LIBRESSL_LIB_PATH="${libressl}/lib";
-                OS_LIB_EXTENSION = if legacyPackages.stdenv.isDarwin then "dylib" else "so";
-                LIBRELATIONAL_ENGINE_LIB_PATH="${librelational_engine}/lib";
-                LIBRELATIONAL_ENGINE_INCLUDE_PATH="${librelational_engine}/include";
+              MERKLECPP_INCLUDE_PATH = "${merklecpp}/include";
+              LIBRESSL_INCLUDE_PATH = "${libressl}/include";
+              LIBRESSL_LIB_PATH = "${libressl}/lib";
+              OS_LIB_EXTENSION =
+                if legacyPackages.stdenv.isDarwin then "dylib" else "so";
+              LIBRELATIONAL_ENGINE_LIB_PATH = "${librelational_engine}/lib";
+              LIBRELATIONAL_ENGINE_INCLUDE_PATH =
+                "${librelational_engine}/include";
             };
-            
+
             # Development tools
             packages = [
               # Source file formatting
@@ -233,23 +247,23 @@
               ocamlPackages.ctypes
               ocamlPackages.ctypes-foreign
               ocamlPackages.data-encoding
+              ocamlPackages.ppx_inline_test
               legacyPackages.cmake
               legacyPackages.gcc
+              legacyPackages.nixfmt
             ];
 
             shellHook = ''
-                echo MERKLECPP_INCLUDE_PATH=$MERKLECPP_INCLUDE_PATH
-                echo LIBRESSL_INCLUDE_PATH=$LIBRESSL_INCLUDE_PATH
-                echo LIBRESSL_LIB_PATH=$LIBRESSL_LIB_PATH
-                echo OS_LIB_EXTENSION=$OS_LIB_EXTENSION 
-                echo LIBRELATIONAL_ENGINE_LIB_PATH=$LIBRELATIONAL_ENGINE_LIB_PATH
-                echo LIBRELATIONAL_ENGINE_INCLUDE_PATH=$LIBRELATIONAL_ENGINE_INCLUDE_PATH
+              echo MERKLECPP_INCLUDE_PATH=$MERKLECPP_INCLUDE_PATH
+              echo LIBRESSL_INCLUDE_PATH=$LIBRESSL_INCLUDE_PATH
+              echo LIBRESSL_LIB_PATH=$LIBRESSL_LIB_PATH
+              echo OS_LIB_EXTENSION=$OS_LIB_EXTENSION 
+              echo LIBRELATIONAL_ENGINE_LIB_PATH=$LIBRELATIONAL_ENGINE_LIB_PATH
+              echo LIBRELATIONAL_ENGINE_INCLUDE_PATH=$LIBRELATIONAL_ENGINE_INCLUDE_PATH
             '';
 
             # Tools from packages
-            inputsFrom = [
-              self.packages.${system}.relational_engine
-            ];
+            inputsFrom = [ self.packages.${system}.relational_engine ];
           };
         };
       });

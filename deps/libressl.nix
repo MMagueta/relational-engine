@@ -2,7 +2,7 @@
 pkgs.stdenv.mkDerivation {
   name = "libressl-lib";
   src = ./.;
-  buildInputs = with pkgs; [libressl.dev pkg-config];
+  buildInputs = with pkgs; [ libressl.dev pkg-config ];
   installPhase = ''
     mkdir -p $out/lib
     mkdir -p $out/include

@@ -56,18 +56,33 @@ module Executor = struct
         hash: string }
   end
   module Hashes = struct
-    type t = string list
+    type t = { values: string list;
+               hash: string }
+    type history = t list
   end
-  type files = Hashes.t StringMap.t
+  type commit = { state: string; files: Hashes.history StringMap.t }
+  type history = commit list
   type locations = Location.t StringMap.t
   let _EMPTY_SHA_HASH_ = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
   (** Initializes the virtual file or opens it. *)
-  let init_file (files: Hashes.t StringMap.t) filename: Hashes.t StringMap.t =
+  let init_file (files: Hashes.history StringMap.t) filename: Hashes.history StringMap.t =
     match StringMap.find_opt filename files with
-    | None -> StringMap.add filename [_EMPTY_SHA_HASH_] files
-    | Some _ -> files
-  let write (files: files) (locations: locations) filename ?hash_to_replace (content: Bytes.t) =
+    | None ->
+       let default: Hashes.t = { values = []; hash = _EMPTY_SHA_HASH_} in
+       let new_files = StringMap.add filename [default] files
+       in new_files
+    | Some _ ->
+       files
+
+  let compose_new_state files =
+    let history = StringMap.to_list files in
+    let all_hashes = List.concat
+                     @@ List.map (fun (_, (history:Hashes.history)) ->
+                            List.map (fun ({hash; _}: Hashes.t) -> hash) history) history
+    in Interop.Merkle.merkle_generate_root all_hashes
+  
+  let write ({files;_} as commit: commit) (locations: locations) ~filename ?hash_to_replace (content: Bytes.t) =
     let files = init_file files filename in
     let computed_hash: string = Interop.Sha256.compute_hash content in
     match StringMap.find_opt computed_hash locations with
@@ -79,38 +94,58 @@ module Executor = struct
             let files =
               StringMap.update
                 filename
-                (function Some file_hashes -> Some (computed_hash::file_hashes) | None -> Some [computed_hash])
+                (function
+                 | Some (file_hashes: Hashes.history) ->
+                    let {values; _}: Hashes.t = List.hd file_hashes in
+                    let new_state = Interop.Merkle.merkle_generate_root (computed_hash::values) in
+                    Some ({values = computed_hash::values; hash = new_state}::file_hashes)
+                 | None -> Some [{values = [computed_hash]; hash = computed_hash}])
                 files
             in
             let open Extensions.Result in
             let+ (size, offset) = FS.append Storage content in
             let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
-            Ok (files, locations)
+            let commit = {state = compose_new_state files; files}
+            in Ok (commit, locations)
           end
         | Some hash_to_replace ->
-           let files = StringMap.update filename (function Some file_hashes -> Some (List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) file_hashes) | None -> Some [computed_hash]) files in
+           let update_fun = function
+             | Some (file_hashes: Hashes.history) ->
+                let {values; _}: Hashes.t = List.hd file_hashes in
+                let updated_entry = List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) values in
+                let new_entry: Hashes.t = {values = updated_entry; hash = Interop.Merkle.merkle_generate_root updated_entry} in
+                Some (new_entry::file_hashes)
+             | None -> Some [{values = [computed_hash]; hash = computed_hash}]
+           in
+           let files = StringMap.update filename update_fun files in
            let open Extensions.Result in
            let+ (size, offset) = FS.append Storage content in
            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
-           Ok (files, locations)
+           let commit = {state = compose_new_state files; files}
+           in Ok (commit, locations)
         end
     | Some _ ->
         begin match hash_to_replace with
         | Some hash_to_replace ->
-           let files =
-             StringMap.update filename
-               (function
-                | Some file_hashes -> Some (List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) file_hashes)
-                | None -> Some [computed_hash])
-               files in
-           Ok (files, locations)
+           let update_fun = function
+             | Some (file_hashes: Hashes.history) ->
+                let {values; _}: Hashes.t = List.hd file_hashes in
+                let updated_entry = List.map (fun hash -> if hash = hash_to_replace then computed_hash else hash) values in
+                let new_entry: Hashes.t = {values = updated_entry; hash = Interop.Merkle.merkle_generate_root updated_entry} in
+                Some (new_entry::file_hashes)
+             | None -> Some [{values = [computed_hash]; hash = computed_hash}]
+           in
+           let files = StringMap.update filename update_fun files in
+           let commit = {state = compose_new_state files; files}
+           in Ok (commit, locations)
         | None ->
-           Ok (files, locations)
+           Ok (commit, locations)
         end
 end
 
 module Startup = struct
-  let () = DevelopmentConfiguration.assure()
+  (* TODO: Weird behavior with a system error on the dir /tmp/relational-engine opening. Disabling for now *)
+  (* let () = DevelopmentConfiguration.assure() *)
 end
 
 module Command = struct
