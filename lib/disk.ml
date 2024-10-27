@@ -60,7 +60,8 @@ module Executor = struct
                hash: string }
     type history = t list
   end
-  type files = Hashes.history StringMap.t
+  type commit = { state: string; files: Hashes.history StringMap.t }
+  type history = commit list
   type locations = Location.t StringMap.t
   let _EMPTY_SHA_HASH_ = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
@@ -68,10 +69,20 @@ module Executor = struct
   let init_file (files: Hashes.history StringMap.t) filename: Hashes.history StringMap.t =
     match StringMap.find_opt filename files with
     | None ->
-       let default: Hashes.t = { values = []; hash = _EMPTY_SHA_HASH_}
-       in StringMap.add filename [default] files
-    | Some _ -> files
-  let write (files: files) (locations: locations) filename ?hash_to_replace (content: Bytes.t) =
+       let default: Hashes.t = { values = []; hash = _EMPTY_SHA_HASH_} in
+       let new_files = StringMap.add filename [default] files
+       in new_files
+    | Some _ ->
+       files
+
+  let compose_new_state files =
+    let history = StringMap.to_list files in
+    let all_hashes = List.concat
+                     @@ List.map (fun (_, (history:Hashes.history)) ->
+                            List.map (fun ({hash; _}: Hashes.t) -> hash) history) history
+    in Interop.Merkle.merkle_generate_root all_hashes
+  
+  let write ({files;_} as commit: commit) (locations: locations) filename ?hash_to_replace (content: Bytes.t) =
     let files = init_file files filename in
     let computed_hash: string = Interop.Sha256.compute_hash content in
     match StringMap.find_opt computed_hash locations with
@@ -94,7 +105,8 @@ module Executor = struct
             let open Extensions.Result in
             let+ (size, offset) = FS.append Storage content in
             let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
-            Ok (files, locations)
+            let commit = {state = compose_new_state files; files}
+            in Ok (commit, locations)
           end
         | Some hash_to_replace ->
            let update_fun = function
@@ -109,7 +121,8 @@ module Executor = struct
            let open Extensions.Result in
            let+ (size, offset) = FS.append Storage content in
            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
-           Ok (files, locations)
+           let commit = {state = compose_new_state files; files}
+           in Ok (commit, locations)
         end
     | Some _ ->
         begin match hash_to_replace with
@@ -123,9 +136,10 @@ module Executor = struct
              | None -> Some [{values = [computed_hash]; hash = computed_hash}]
            in
            let files = StringMap.update filename update_fun files in
-           Ok (files, locations)
+           let commit = {state = compose_new_state files; files}
+           in Ok (commit, locations)
         | None ->
-           Ok (files, locations)
+           Ok (commit, locations)
         end
 end
 
