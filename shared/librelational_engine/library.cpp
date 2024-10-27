@@ -66,7 +66,7 @@ extern "C" {
             ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
 
         std::memcpy(computed_hash, ss.str().c_str(), HASH_SIZE);
-        std::cout << "⚙️ COMPUTED HASH: " << computed_hash << std::endl;
+        // std::cout << "⚙️ COMPUTED HASH: " << computed_hash << std::endl;
     }
 
     extern int trash() { return 100; }

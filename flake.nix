@@ -90,6 +90,7 @@
                 ctypes
                 ctypes-foreign
                 data-encoding
+                ppx_inline_test
               ];
 
               strictDeps = true;
@@ -146,6 +147,26 @@
                 ocamlPackages.dune_3
                 ocamlPackages.ocaml
                 legacyPackages.ocamlformat
+              ];
+            }
+            ''
+              echo "checking dune and ocaml formatting"
+              dune build \
+                --display=short \
+                --no-print-directory \
+                --root="${sources.ocaml}" \
+                --build-dir="$(pwd)/_build" \
+                @fmt
+              touch $out
+            '';
+
+          dune-test = legacyPackages.runCommand "check-dune-test"
+            {
+              nativeBuildInputs = [
+                ocamlPackages.dune_3
+                ocamlPackages.ocaml
+                legacyPackages.ocamlformat
+                ocamlPackages.ppx_inline_test
               ];
             }
             ''
@@ -233,6 +254,7 @@
               ocamlPackages.ctypes
               ocamlPackages.ctypes-foreign
               ocamlPackages.data-encoding
+              ocamlPackages.ppx_inline_test
               legacyPackages.cmake
               legacyPackages.gcc
             ];

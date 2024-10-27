@@ -82,7 +82,7 @@ module Executor = struct
                             List.map (fun ({hash; _}: Hashes.t) -> hash) history) history
     in Interop.Merkle.merkle_generate_root all_hashes
   
-  let write ({files;_} as commit: commit) (locations: locations) filename ?hash_to_replace (content: Bytes.t) =
+  let write ({files;_} as commit: commit) (locations: locations) ~filename ?hash_to_replace (content: Bytes.t) =
     let files = init_file files filename in
     let computed_hash: string = Interop.Sha256.compute_hash content in
     match StringMap.find_opt computed_hash locations with
