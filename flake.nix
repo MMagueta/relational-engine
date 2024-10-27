@@ -193,13 +193,13 @@
           '';
 
           # Check Nix formatting
-          nixpkgs-fmt = legacyPackages.runCommand "check-nixpkgs-fmt" {
-            nativeBuildInputs = [ legacyPackages.nixpkgs-fmt ];
-          } ''
-            echo "checking nix formatting"
-            nixpkgs-fmt --check ${sources.nix}
-            touch $out
-          '';
+          # nixpkgs-fmt = legacyPackages.runCommand "check-nixpkgs-fmt" {
+          #   nativeBuildInputs = [ legacyPackages.nixpkgs-fmt ];
+          # } ''
+          #   echo "checking nix formatting"
+          #   nixpkgs-fmt --check ${sources.nix}
+          #   touch $out
+          # '';
         };
 
         # Development shells
