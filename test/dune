@@ -2,4 +2,5 @@
  (name test_relational_engine)
  (libraries relational_engine)
  (inline_tests)
- (preprocess (pps ppx_inline_test)))
+ (preprocess
+  (pps ppx_inline_test)))
