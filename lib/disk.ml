@@ -191,12 +191,13 @@ module Command = struct
 
   (** TODO: This does not write atomically. If the system crashes while it attempts to write, it will corrupt.
      Solve this with a temporary file and move later. *)
-  let commit 
-    (* (_files: Filesystem.files) (_locations: Filesystem.locations)  *)
-   command =
+  let commit_and_perform (commit: Executor.commit) (locations: Executor.locations) command =
       let open Extensions.Result in
       let+ serialized_command =
         Result.map_error (fun _ -> "Failed to serialize command to binary format.")
         @@ Binary.to_bytes command_encoding command in
-      FS.append FS.Transaction serialized_command
+      let+ _ = FS.append FS.Transaction serialized_command in
+      match command.kind with
+      | WRITE -> Executor.write commit locations ~filename:command.filename @@ Bytes.of_string command.content
+      | _ -> Ok (commit, locations)
 end

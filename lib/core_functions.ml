@@ -20,6 +20,4 @@ module Functions (F : Ctypes.FOREIGN) = struct
       ~filename:((Sys.getenv "LIBRELATIONAL_ENGINE_LIB_PATH") ^ "/librelational_engine." ^ os_extension)
   let compute_hash = Foreign.foreign ~from:libmerklecpp "compute_hash" (ptr char @-> Ctypes.string @-> returning void)
   let merkle_generate_root = Foreign.foreign ~from:libmerklecpp "merkle_generate_root" (ptr Ctypes.string @-> int @-> ptr char @-> returning void)
-  let register_to_merkle = Foreign.foreign ~from:libmerklecpp "register_to_merkle" (Ctypes.string @-> Ctypes.string @-> returning void)
-
 end

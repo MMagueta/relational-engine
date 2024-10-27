@@ -27,26 +27,6 @@ void write_tree(const char* tree_path, const std::vector<uint8_t>& serialized_tr
 
 extern "C" {
 #include "library.h"
-    extern void register_to_merkle(const char* tree_path, const char* computed_hash) {
-        struct stat st;
-        if (stat(tree_path, &st) == 0) {
-            const std::vector<uint8_t> tree_bytes = read_tree(tree_path);
-            merkle::Tree tree;
-            tree.deserialise(tree_bytes);
-            const merkle::Tree::Hash hash(computed_hash);
-            tree.insert(hash);
-            std::vector<uint8_t> target;
-            tree.serialise(target);
-            write_tree(tree_path, target);
-        } else {
-            merkle::Tree::Hash hash(computed_hash);
-            merkle::Tree tree;
-            tree.insert(hash);
-            std::vector<uint8_t> target;
-            tree.serialise(target);
-            write_tree(tree_path, target);
-        }
-    }
     extern void merkle_generate_root(char** hashes, const int n, char* root) {
         merkle::Tree tree;
         for (int i = 0; i < n; i++){
