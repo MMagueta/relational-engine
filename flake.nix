@@ -250,6 +250,7 @@
               ocamlPackages.ppx_inline_test
               legacyPackages.cmake
               legacyPackages.gcc
+              legacyPackages.nixfmt
             ];
 
             shellHook = ''
