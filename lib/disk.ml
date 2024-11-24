@@ -22,6 +22,7 @@ module type FileSystem = sig
     | Storage
     | Transaction
   val append: target -> bytes -> (int*int64, string) result
+  val read: target -> int64 -> int -> (bytes, string) result
 end
 
 module FileSystem (C: Configuration): FileSystem = struct
@@ -29,21 +30,44 @@ module FileSystem (C: Configuration): FileSystem = struct
     | Storage
     | Transaction
   let target_to_string = function
-    | Storage -> "storage"
-    | Transaction -> "transaction"
+    | Storage -> C.storage ^ "storage.re"
+    | Transaction -> C.transactions ^ "transaction.re"
 
   (** [append target content] writes content to file in append only format, returning [content_length * offset_written] *)
   let append target content =
     let register channel =
-      let offset_written = Out_channel.length channel in
-      Out_channel.seek channel offset_written;
+      let offset_written =
+        try
+          let stats = Unix.stat (target_to_string target) in
+          Int64.of_int stats.Unix.st_size
+        with _ -> 0L
+      in
+      (* Out_channel.seek channel offset_written; *)
+      (* let offset_written = Out_channel.length channel in *)
       Out_channel.output_bytes channel content;
       Out_channel.flush channel;
       Out_channel.close channel;
       Ok (Bytes.length content, offset_written)
     in
-    try Out_channel.with_open_bin (target_to_string target) register
-    with _ -> Error (Printf.sprintf "Error on appending to target '%s'" (target_to_string target))
+    try 
+      Out_channel.with_open_gen [Open_append; Open_binary; Open_creat] 0o666 (target_to_string target) register
+    with e ->
+      Error (Printf.sprintf "Error on appending to target '%s': %s" (target_to_string target) (Printexc.to_string e))
+
+  let read target (offset: int64) size =
+    print_endline ("READ_OFFSET: " ^ Int64.to_string offset);
+    print_endline ("READ_SIZE: " ^ (string_of_int ((Int64.to_int offset) + size)));
+    let register (channel: in_channel) =
+      let buffer = Bytes.create size in
+      In_channel.seek channel offset;
+      let _ = In_channel.really_input channel buffer 0 size in
+      print_bytes buffer;
+      print_newline ();
+      In_channel.close channel;
+      Ok buffer
+    in
+    try In_channel.with_open_gen [Open_binary; Open_rdonly] 0o666 (target_to_string target) register
+    with e -> Error (Printf.sprintf "Error on reading from target '%s': %s" (target_to_string target) (Printexc.to_string e))
 end
 
 module Executor = struct
@@ -54,11 +78,14 @@ module Executor = struct
       { offset: int64;
         size: int;
         hash: string }
+    [@@deriving show]
   end
   module Hashes = struct
     type t = { values: string list;
                hash: string }
+    [@@deriving show]
     type history = t list
+    [@@deriving show]
   end
   type commit = { state: string; files: Hashes.history StringMap.t }
   type history = commit list
@@ -104,6 +131,7 @@ module Executor = struct
             in
             let open Extensions.Result in
             let+ (size, offset) = FS.append Storage content in
+            let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
             let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
             let commit = {state = compose_new_state files; files}
             in Ok (commit, locations)
@@ -120,6 +148,7 @@ module Executor = struct
            let files = StringMap.update filename update_fun files in
            let open Extensions.Result in
            let+ (size, offset) = FS.append Storage content in
+           let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
            let commit = {state = compose_new_state files; files}
            in Ok (commit, locations)
@@ -141,6 +170,14 @@ module Executor = struct
         | None ->
            Ok (commit, locations)
         end
+  
+  let read ({files; _} as _commit: commit) (locations: locations) ~filename =
+    let history: Hashes.history = StringMap.find filename files in
+    let {values = location_hashes; _}: Hashes.t = List.hd history in
+    let physical_locations = List.map (fun hash -> StringMap.find hash locations) location_hashes in
+    (* Terrible! Here I read everything opening a new IO every time. We should be able to read with only one call, but changing the offset every time *)
+    let content = List.map (fun ({offset; size; _}: Location.t) -> match FS.read FS.Storage offset size with | Ok x -> x | Error err -> failwith err) physical_locations
+    in Bytes.concat Bytes.empty @@ List.rev content
 end
 
 module Startup = struct
@@ -191,13 +228,22 @@ module Command = struct
 
   (** TODO: This does not write atomically. If the system crashes while it attempts to write, it will corrupt.
      Solve this with a temporary file and move later. *)
-  let commit_and_perform (commit: Executor.commit) (locations: Executor.locations) command =
+  let commit_and_perform (stream: Executor.history) (locations: Executor.locations) command =
       let open Extensions.Result in
       let+ serialized_command =
         Result.map_error (fun _ -> "Failed to serialize command to binary format.")
         @@ Binary.to_bytes command_encoding command in
       let+ _ = FS.append FS.Transaction serialized_command in
       match command.kind with
-      | WRITE -> Executor.write commit locations ~filename:command.filename @@ Bytes.of_string command.content
-      | _ -> Ok (commit, locations)
+      | WRITE ->
+         let open Extensions.Result in
+         let+ (commit, locations) = Executor.write (List.hd stream) locations ~filename:command.filename @@ Bytes.of_string command.content in
+         let updated_stream = commit::stream in
+         Ok (updated_stream, locations)
+      | READ ->
+         let content = Executor.read (List.hd stream) locations ~filename:command.filename in
+         print_string "CONTENT: ";
+         print_endline @@ Bytes.to_string content;
+         Ok (stream, locations)
+      | _ -> Ok (stream, locations)
 end

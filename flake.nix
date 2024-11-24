@@ -164,6 +164,7 @@
               ocamlPackages.ocaml
               legacyPackages.ocamlformat
               ocamlPackages.ppx_inline_test
+              ocamlPackages.ppx_deriving
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -233,7 +234,7 @@
               legacyPackages.nixpkgs-fmt
               legacyPackages.ocamlformat
               # For `dune build --watch ...`
-              legacyPackages.fswatch
+              # legacyPackages.fswatch
               # For `dune build @doc`
               ocamlPackages.odoc
               # OCaml editor support
@@ -248,9 +249,10 @@
               ocamlPackages.ctypes-foreign
               ocamlPackages.data-encoding
               ocamlPackages.ppx_inline_test
+              ocamlPackages.ppx_deriving
               legacyPackages.cmake
               legacyPackages.gcc
-              legacyPackages.nixfmt-classic
+              # legacyPackages.nixfmt-classic
             ];
 
             shellHook = ''
