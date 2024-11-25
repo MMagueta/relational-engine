@@ -16,9 +16,9 @@ let client_read sock maxlen =
   let str = Bytes.create maxlen in
   let rec _read sock acc =
     Lwt_unix.read sock str 0 maxlen
-    >>= fun recvlen -> Lwt_io.write_line Lwt_io.stdout (string_of_int recvlen)
+    >>= fun recvlen -> Lwt_io.write_line Lwt_io.stdout (Printf.sprintf "[LOG] Received %d bytes from client" recvlen)
     >>= fun () -> if recvlen <= maxlen
-                  then Lwt.return acc
+                  then Lwt.return (acc ^ (Bytes.to_string (Bytes.sub str 0 recvlen)))
                   else _read sock (acc ^ (Bytes.to_string (Bytes.sub str 0 recvlen)))
   in _read sock ""
 
@@ -26,6 +26,9 @@ let rec socket_read sock =
   Lwt_unix.accept sock
   >>= fun (client, _) -> client_read client 512
   >>= fun results -> Lwt_io.write_line Lwt_io.stdout results
+  >>= fun () -> return results
+  >>= fun results -> Lwt_unix.send client (Bytes.of_string results) 0 (String.length results) []
+  >>= fun _ -> Lwt_unix.wait_write client
   >>= fun () -> Lwt_unix.close client
   >>= fun () -> socket_read sock
 

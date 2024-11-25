@@ -20,5 +20,5 @@
 
 (setq msg "Hello Relational Engine! :)")
 
-(relational-client msg)x
+(relational-client msg)
 *mailbox*
