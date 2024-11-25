@@ -26,11 +26,12 @@
         # Legacy packages that have not been converted to flakes
         legacyPackages = nixpkgs.legacyPackages.${system};
         # OCaml packages available on nixpkgs
-        ocamlPackages = legacyPackages.ocamlPackages;
         # Library functions from nixpkgs
         lib = legacyPackages.lib;
+        ocamlPackages = legacyPackages.ocamlPackages;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix { };
         libressl = legacyPackages.callPackage ./deps/libressl.nix { };
+        ppx_protocol_conv = legacyPackages.callPackage ./deps/ppx_protocol_conv.nix { lib = legacyPackages.lib; fetchFromGitHub = legacyPackages.fetchFromGitHub; ocamlPackages = ocamlPackages; };
         librelational_engine =
           legacyPackages.callPackage ./deps/relational_engine_lib.nix {
             libressl = libressl;
@@ -89,16 +90,16 @@
 
             nativeInputs = [ ];
 
-            buildInputs = with ocamlPackages; [
+            buildInputs = [ppx_protocol_conv] ++ (with ocamlPackages; [
               ctypes
               ctypes-foreign
               data-encoding
               ppx_inline_test
-              ocamlPackages.ppx_deriving
-              ocamlPackages.ppx_sexp_conv
-              ocamlPackages.lwt
-              ocamlPackages.lwt-exit
-            ];
+              ppx_deriving
+              ppx_sexp_conv
+              lwt
+              lwt-exit
+            ]);
 
             strictDeps = true;
 
@@ -172,6 +173,7 @@
               ocamlPackages.ppx_sexp_conv
               ocamlPackages.lwt
               ocamlPackages.lwt-exit
+              ppx_protocol_conv
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -263,6 +265,7 @@
               # legacyPackages.nixfmt-classic
               ocamlPackages.lwt
               ocamlPackages.lwt-exit
+              ppx_protocol_conv
             ];
 
 
