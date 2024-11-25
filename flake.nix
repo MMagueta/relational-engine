@@ -31,6 +31,12 @@
         lib = legacyPackages.lib;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix { };
         libressl = legacyPackages.callPackage ./deps/libressl.nix { };
+        ppx_xml_conv = ocamlPackages.janePackage {
+          pname = "ppx_xml_conv";
+          hash = "sha256-4U0ZlV8OYXwNUz3bbxf49qovGTI8vyn7L3YJy0AndrM=";
+          meta.description = "Generate XML conversion functions from records";
+          propagatedBuildInputs = [ ocamlPackages.ppxlib ocamlPackages.csvfields ocamlPackages.ppx_conv_func ];
+        };
         librelational_engine =
           legacyPackages.callPackage ./deps/relational_engine_lib.nix {
             libressl = libressl;
@@ -94,6 +100,9 @@
               ctypes-foreign
               data-encoding
               ppx_inline_test
+              ocamlPackages.ppx_deriving
+              ocamlPackages.ppx_sexp_conv
+              ppx_xml_conv
             ];
 
             strictDeps = true;
@@ -165,6 +174,8 @@
               legacyPackages.ocamlformat
               ocamlPackages.ppx_inline_test
               ocamlPackages.ppx_deriving
+              ocamlPackages.ppx_sexp_conv
+              ppx_xml_conv
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -250,9 +261,11 @@
               ocamlPackages.data-encoding
               ocamlPackages.ppx_inline_test
               ocamlPackages.ppx_deriving
+              ocamlPackages.ppx_sexp_conv
               legacyPackages.cmake
               legacyPackages.gcc
               # legacyPackages.nixfmt-classic
+              ppx_xml_conv
             ];
 
             shellHook = ''

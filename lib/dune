@@ -1,7 +1,7 @@
 (library
  (name relational_engine)
  (libraries ctypes ctypes-foreign data-encoding)
- (preprocess (pps ppx_deriving.show ppx_deriving.ord))
+ (preprocess (pps ppx_deriving.show ppx_sexp_conv))
  ;; (c_library_flags -lssl -lcrypto -L %{env:LIBRESSL_LIB_PATH=})
  ;; (foreign_stubs
  ;;  (language cxx)

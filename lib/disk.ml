@@ -134,7 +134,7 @@ module Executor = struct
             let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
             let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
             let commit = {state = compose_new_state files; files}
-            in Ok (commit, locations)
+            in Ok ((commit, locations), Some computed_hash)
           end
         | Some hash_to_replace ->
            let update_fun = function
@@ -151,7 +151,7 @@ module Executor = struct
            let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
            let commit = {state = compose_new_state files; files}
-           in Ok (commit, locations)
+           in Ok ((commit, locations), Some computed_hash)
         end
     | Some _ ->
         begin match hash_to_replace with
@@ -166,9 +166,9 @@ module Executor = struct
            in
            let files = StringMap.update filename update_fun files in
            let commit = {state = compose_new_state files; files}
-           in Ok (commit, locations)
+           in Ok ((commit, locations), Some computed_hash)
         | None ->
-           Ok (commit, locations)
+           Ok ((commit, locations), None)
         end
   
   let read ({files; _} as _commit: commit) (locations: locations) ~filename =
@@ -177,7 +177,8 @@ module Executor = struct
     let physical_locations = List.map (fun hash -> StringMap.find hash locations) location_hashes in
     (* Terrible! Here I read everything opening a new IO every time. We should be able to read with only one call, but changing the offset every time *)
     let content = List.map (fun ({offset; size; _}: Location.t) -> match FS.read FS.Storage offset size with | Ok x -> x | Error err -> failwith err) physical_locations
-    in Bytes.concat Bytes.empty @@ List.rev content
+    in (*Bytes.concat Bytes.empty @@*)
+         List.rev content
 end
 
 module Startup = struct
@@ -206,26 +207,33 @@ module Command = struct
         Data_encoding.empty
         (function READ -> Some () | _ -> None)
         (function () -> READ);
-    ]
+      ]
+  
   type t =
     { kind: command_kind;
       timestamp: float;
       hash: string;
       filename: string;
+      references: string list;
       (* branch must be added here later *)
       content: string }
   let command_encoding =
     conv 
-      (fun {kind; timestamp; hash; filename; content} -> (kind, timestamp, hash, filename, content))
-      (fun (kind, timestamp, hash, filename, content) -> {kind; timestamp; hash; filename; content})
-      Data_encoding.(tup5 command_kind_encoding float string string string)
+      (fun {kind; timestamp; hash; filename; references; content} -> (kind, timestamp, hash, filename, references, content))
+      (fun (kind, timestamp, hash, filename, references, content) -> {kind; timestamp; hash; filename; references; content})
+      Data_encoding.(tup6 command_kind_encoding float string string (list string) string)
   
   let parse_command ~data =
-    let contract_encoding = Data_encoding.(tup4 command_kind_encoding string string string) in
+    let contract_encoding = Data_encoding.(tup5 command_kind_encoding string string (list string) string) in
     match Binary.of_bytes_opt contract_encoding data with
-    | Some (kind, hash, filename, content) -> Ok {kind; timestamp = Unix.time(); hash; filename; content}
+    | Some (kind, hash, filename, references, content) -> Ok {kind; timestamp = Unix.time(); hash; filename; references; content}
     | None -> Error "Failed to parse command"
 
+  type return =
+    | ComputedHash of string
+    | Read of bytes list
+    | Nothing
+  
   (** TODO: This does not write atomically. If the system crashes while it attempts to write, it will corrupt.
      Solve this with a temporary file and move later. *)
   let commit_and_perform (stream: Executor.history) (locations: Executor.locations) command =
@@ -235,15 +243,18 @@ module Command = struct
         @@ Binary.to_bytes command_encoding command in
       let+ _ = FS.append FS.Transaction serialized_command in
       match command.kind with
-      | WRITE ->
+      | WRITE -> begin
          let open Extensions.Result in
-         let+ (commit, locations) = Executor.write (List.hd stream) locations ~filename:command.filename @@ Bytes.of_string command.content in
+         let+ ((commit, locations), computed_hash_handle) = Executor.write (List.hd stream) locations ~filename:command.filename @@ Bytes.of_string command.content in
          let updated_stream = commit::stream in
-         Ok (updated_stream, locations)
+         match computed_hash_handle with
+         | Some computed_hash_handle -> Ok ((updated_stream, locations), ComputedHash computed_hash_handle)
+         | None -> Ok ((updated_stream, locations), Nothing)
+         end
       | READ ->
          let content = Executor.read (List.hd stream) locations ~filename:command.filename in
-         print_string "CONTENT: ";
-         print_endline @@ Bytes.to_string content;
-         Ok (stream, locations)
-      | _ -> Ok (stream, locations)
+         (* print_string "CONTENT: "; *)
+         (* print_endline @@ Bytes.to_string content; *)
+         Ok ((stream, locations), Read content)
+      | _ -> Error "Unimplemented method"
 end
