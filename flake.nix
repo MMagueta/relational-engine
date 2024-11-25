@@ -31,12 +31,6 @@
         lib = legacyPackages.lib;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix { };
         libressl = legacyPackages.callPackage ./deps/libressl.nix { };
-        ppx_xml_conv = ocamlPackages.janePackage {
-          pname = "ppx_xml_conv";
-          hash = "sha256-4U0ZlV8OYXwNUz3bbxf49qovGTI8vyn7L3YJy0AndrM=";
-          meta.description = "Generate XML conversion functions from records";
-          propagatedBuildInputs = [ ocamlPackages.ppxlib ocamlPackages.csvfields ocamlPackages.ppx_conv_func ];
-        };
         librelational_engine =
           legacyPackages.callPackage ./deps/relational_engine_lib.nix {
             libressl = libressl;
@@ -102,7 +96,8 @@
               ppx_inline_test
               ocamlPackages.ppx_deriving
               ocamlPackages.ppx_sexp_conv
-              ppx_xml_conv
+              ocamlPackages.lwt
+              ocamlPackages.lwt_log
             ];
 
             strictDeps = true;
@@ -175,7 +170,8 @@
               ocamlPackages.ppx_inline_test
               ocamlPackages.ppx_deriving
               ocamlPackages.ppx_sexp_conv
-              ppx_xml_conv
+              ocamlPackages.lwt
+              ocamlPackages.lwt_log
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -265,8 +261,10 @@
               legacyPackages.cmake
               legacyPackages.gcc
               # legacyPackages.nixfmt-classic
-              ppx_xml_conv
+              ocamlPackages.lwt
+              ocamlPackages.lwt_log
             ];
+
 
             shellHook = ''
               echo MERKLECPP_INCLUDE_PATH=$MERKLECPP_INCLUDE_PATH

@@ -1,9 +1,14 @@
 open Sexplib0
 open Sexplib0.Sexp_conv
-open Ppx_xml_conv
+
 module Protocol = struct
-  type tuples = string list list
-  [@@deriving sexp, ]
+  type tuple = string list [@@deriving sexp]
+  type relation =
+    { attribute_name: string;
+      attribute_type: string;
+      tuples: tuple }
+      [@@deriving sexp]
+  type t = relation list [@@deriving sexp]
 end
 
 let write_and_retrieve() =
@@ -35,5 +40,6 @@ let write_and_retrieve() =
   let+ (_, Command.Read last_name) = Command.commit_and_perform (List.tl stream) locations command_read2 in
   (* List.iter (fun a -> print_endline a) (List.map Bytes.to_string first_name); *)
   (* List.iter (fun a -> print_endline a) (List.map Bytes.to_string last_name); *)
-  Ok (Sexp.to_string (Protocol.sexp_of_tuples [List.map Bytes.to_string first_name; List.map Bytes.to_string last_name]))
+  Ok (Sexp.to_string (Protocol.sexp_of_t [{attribute_name = "user/first-name"; attribute_type = "string"; tuples = List.map Bytes.to_string first_name};
+                                          {attribute_name = "user/last-name"; attribute_type = "string"; tuples = List.map Bytes.to_string last_name}]))
     [@@warning "-8"] (* Suppress pattern match incomplete warnings *)
