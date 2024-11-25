@@ -9,7 +9,7 @@
     (delete-process process)))
 
 (setq relational-engine-address "localhost")
-(setq relational-engine-port 4457)
+(setq relational-engine-port 7524)
 
 (defun relational-client (content)
   ""
@@ -18,7 +18,7 @@
     (set-process-filter connection 'relational-engine-handler)
     (process-send-string connection content)))
 
-(setq msg "read")
+(setq msg "Hello Relational Engine! :)")
 
-(relational-client msg)
+(relational-client msg)x
 *mailbox*

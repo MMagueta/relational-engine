@@ -97,7 +97,7 @@
               ocamlPackages.ppx_deriving
               ocamlPackages.ppx_sexp_conv
               ocamlPackages.lwt
-              ocamlPackages.lwt_log
+              ocamlPackages.lwt-exit
             ];
 
             strictDeps = true;
@@ -171,7 +171,7 @@
               ocamlPackages.ppx_deriving
               ocamlPackages.ppx_sexp_conv
               ocamlPackages.lwt
-              ocamlPackages.lwt_log
+              ocamlPackages.lwt-exit
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -262,7 +262,7 @@
               legacyPackages.gcc
               # legacyPackages.nixfmt-classic
               ocamlPackages.lwt
-              ocamlPackages.lwt_log
+              ocamlPackages.lwt-exit
             ];
 
 
