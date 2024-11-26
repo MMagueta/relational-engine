@@ -11,12 +11,12 @@ ocamlPackages.buildDunePackage {
     owner = "andersfugmann";
     repo = "ppx_protocol_conv";
     rev = "master";
-    sha256 = "jJJ6FEn+AkMknqun0GkXh5DSXsJnFbdE7U8BQ7Dd/Fw=";
+    sha256 = "gFYg0251NOPPkc01BiSU3NEj3JWGKg1fu6UgQ67BBZM=";
   };
 
-  buildInputs = [];
+  buildInputs = [ocamlPackages.ppxlib ocamlPackages.ppx_sexp_conv ocamlPackages.sexplib ocamlPackages.alcotest ];
   
-  propagatedBuildInputs = [];
+  propagatedBuildInputs = [ ocamlPackages.ppxlib ocamlPackages.ppx_sexp_conv ocamlPackages.sexplib ocamlPackages.alcotest ];
 
   doCheck = true;
 

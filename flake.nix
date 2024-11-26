@@ -31,13 +31,21 @@
         ocamlPackages = legacyPackages.ocamlPackages;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix { };
         libressl = legacyPackages.callPackage ./deps/libressl.nix { };
-        ppx_protocol_conv = legacyPackages.callPackage ./deps/ppx_protocol_conv.nix { lib = legacyPackages.lib; fetchFromGitHub = legacyPackages.fetchFromGitHub; ocamlPackages = ocamlPackages; };
+        ppx_protocol_conv =
+          legacyPackages.callPackage ./deps/ppx_protocol_conv.nix {
+            lib = legacyPackages.lib;
+            fetchFromGitHub = legacyPackages.fetchFromGitHub;
+            ocamlPackages = ocamlPackages; };
+        ppx_protocol_conv_xml_light =
+          legacyPackages.callPackage ./deps/ppx_protocol_conv_xml_light.nix {
+            lib = legacyPackages.lib;
+            ppx_protocol_conv = ppx_protocol_conv;
+            fetchFromGitHub = legacyPackages.fetchFromGitHub;
+            ocamlPackages = ocamlPackages; };
         librelational_engine =
           legacyPackages.callPackage ./deps/relational_engine_lib.nix {
             libressl = libressl;
-            merklecpp = merklecpp;
-          };
-
+            merklecpp = merklecpp; };
         # Filtered sources (prevents unecessary rebuilds)
         sources = {
           ocaml = nix-filter.lib {
@@ -90,7 +98,9 @@
 
             nativeInputs = [ ];
 
-            buildInputs = [ppx_protocol_conv] ++ (with ocamlPackages; [
+            buildInputs = [ ppx_protocol_conv_xml_light
+                            ppx_protocol_conv ]
+            ++ (with ocamlPackages; [
               ctypes
               ctypes-foreign
               data-encoding
@@ -174,6 +184,7 @@
               ocamlPackages.lwt
               ocamlPackages.lwt-exit
               ppx_protocol_conv
+              ppx_protocol_conv_xml_light
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -266,6 +277,7 @@
               ocamlPackages.lwt
               ocamlPackages.lwt-exit
               ppx_protocol_conv
+              ppx_protocol_conv_xml_light
             ];
 
 

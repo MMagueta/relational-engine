@@ -1,14 +1,16 @@
-open Sexplib0
-open Sexplib0.Sexp_conv
+
 
 module Protocol = struct
-  type tuple = string list [@@deriving sexp]
+  open Protocol_conv_xml
+  open Sexplib0.Sexp_conv
+  type tuple =
+    string list [@@deriving sexp, protocol ~driver:(module Xml_light)]
   type relation =
     { attribute_name: string;
       attribute_type: string;
       tuples: tuple }
-      [@@deriving sexp]
-  type t = relation list [@@deriving sexp]
+      [@@deriving sexp, protocol ~driver:(module Xml_light)]
+  type t = relation list [@@deriving sexp, protocol ~driver:(module Xml_light)]
 end
 
 let write_and_retrieve() =
@@ -40,6 +42,9 @@ let write_and_retrieve() =
   let+ (_, Command.Read last_name) = Command.commit_and_perform (List.tl stream) locations command_read2 in
   (* List.iter (fun a -> print_endline a) (List.map Bytes.to_string first_name); *)
   (* List.iter (fun a -> print_endline a) (List.map Bytes.to_string last_name); *)
-  Ok (Sexp.to_string (Protocol.sexp_of_t [{attribute_name = "user/first-name"; attribute_type = "string"; tuples = List.map Bytes.to_string first_name};
-                                          {attribute_name = "user/last-name"; attribute_type = "string"; tuples = List.map Bytes.to_string last_name}]))
+  let relation_result: Protocol.relation list =
+    [{attribute_name = "user/first-name"; attribute_type = "string"; tuples = List.map Bytes.to_string first_name};
+     {attribute_name = "user/last-name"; attribute_type = "string"; tuples = List.map Bytes.to_string last_name}] in
+  Ok (Xml.to_string (Protocol.to_xml_light relation_result))
+    (* (Sexp.to_string (Protocol.sexp_of_t )) *)
     [@@warning "-8"] (* Suppress pattern match incomplete warnings *)
