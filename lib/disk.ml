@@ -77,7 +77,8 @@ module Executor = struct
     type t =
       { offset: int64;
         size: int;
-        hash: string }
+        hash: string;
+        references: string list }
     [@@deriving show]
   end
   module Hashes = struct
@@ -109,7 +110,7 @@ module Executor = struct
                             List.map (fun ({hash; _}: Hashes.t) -> hash) history) history
     in Interop.Merkle.merkle_generate_root all_hashes
   
-  let write ({files;_} as commit: commit) (locations: locations) ~filename ?hash_to_replace (content: Bytes.t) =
+  let write ({files;_} as commit: commit) (locations: locations) ~filename ?hash_to_replace references (content: Bytes.t) =
     let files = init_file files filename in
     let computed_hash: string = Interop.Sha256.compute_hash content in
     match StringMap.find_opt computed_hash locations with
@@ -132,7 +133,7 @@ module Executor = struct
             let open Extensions.Result in
             let+ (size, offset) = FS.append Storage content in
             let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
-            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
+            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash; references = references}: Location.t) locations in
             let commit = {state = compose_new_state files; files}
             in Ok ((commit, locations), Some computed_hash)
           end
@@ -149,7 +150,7 @@ module Executor = struct
            let open Extensions.Result in
            let+ (size, offset) = FS.append Storage content in
            let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
-           let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
+           let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash; references = references}: Location.t) locations in
            let commit = {state = compose_new_state files; files}
            in Ok ((commit, locations), Some computed_hash)
         end
@@ -164,8 +165,14 @@ module Executor = struct
                 Some (new_entry::file_hashes)
              | None -> Some [{values = [computed_hash]; hash = computed_hash}]
            in
+           let location_update_fun = function
+             | Some (location: Location.t) ->
+                Some { location with references = references@location.references }
+             | None -> None (* This case is a bit weird to exist. Can we ever already add and get nothing? Refactor with the location passed on the `Some _` already *)
+           in
            let files = StringMap.update filename update_fun files in
-           let commit = {state = compose_new_state files; files}
+           let commit = {state = compose_new_state files; files} in
+           let locations = StringMap.update computed_hash location_update_fun locations
            in Ok ((commit, locations), Some computed_hash)
         | None ->
            Ok ((commit, locations), None)
@@ -245,7 +252,7 @@ module Command = struct
       match command.kind with
       | WRITE -> begin
          let open Extensions.Result in
-         let+ ((commit, locations), computed_hash_handle) = Executor.write (List.hd stream) locations ~filename:command.filename @@ Bytes.of_string command.content in
+         let+ ((commit, locations), computed_hash_handle) = Executor.write (List.hd stream) locations ~filename:command.filename command.references @@ Bytes.of_string command.content in
          let updated_stream = commit::stream in
          match computed_hash_handle with
          | Some computed_hash_handle -> Ok ((updated_stream, locations), ComputedHash computed_hash_handle)
