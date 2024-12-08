@@ -200,6 +200,7 @@ module Command = struct
     | OPEN
     | WRITE
     | READ
+    (* | CREATE_RELATION *)
   let command_kind_encoding =
     union [
       case ~title:"open" (Tag 0)
@@ -214,6 +215,10 @@ module Command = struct
         Data_encoding.empty
         (function READ -> Some () | _ -> None)
         (function () -> READ);
+      (* case ~title:"create_relation" (Tag 3) *)
+        (* Data_encoding.empty *)
+        (* (function CREATE_RELATION -> Some () | _ -> None) *)
+        (* (function () -> CREATE_RELATION); *)
       ]
   
   type t =
