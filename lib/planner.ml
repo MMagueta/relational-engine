@@ -1,7 +1,17 @@
 module Scan = struct
   open Disk
   let execute commit locations (entity: string) =
-    Executor.read commit locations ~filename:entity
+    let binary = Executor.read commit locations ~filename:("schema~" ^ entity) in
+    let relation =
+      Result.map_error (fun _ -> "Failed to deserialize relation from binary format.")
+      @@ Data_encoding.Binary.of_bytes Schema.Protocol.relation_encoding (Bytes.concat Bytes.empty binary) in
+    match relation with
+    | Ok relation ->
+       begin
+         let attrs = List.map (fun (a: Schema.Protocol.attribute) -> relation.name ^ "/" ^ a.name) relation.attributes in
+         Executor.read commit locations ~filename:("schema~" ^ entity)
+       end
+    | Error err -> failwith err
 end
 
 module Join = struct

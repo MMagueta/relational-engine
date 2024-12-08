@@ -38,7 +38,7 @@ let test_schema_write_and_retrieve() =
   let locations: Executor.locations = Executor.StringMap.empty in
   let open Extensions.Result in
   let+ user_relation =
-    let relation: Protocol.relation = { name = "user"; attributes = [{name = "first-name"; attr_type = "string"}; {name = "last-name"; attr_type = "string"}] } in
+    let relation: Protocol.relation = { name = "schema~user"; attributes = [{name = "first-name"; attr_type = "string"}; {name = "last-name"; attr_type = "string"}] } in
     Result.map_error (fun _ -> "Failed to serialize relation to binary format.")
         @@ Binary.to_bytes Protocol.relation_encoding relation
   in
@@ -46,7 +46,7 @@ let test_schema_write_and_retrieve() =
     {kind = Command.WRITE; timestamp = 10.0; hash = ""; content = Bytes.to_string user_relation; filename = "user"; references = []} in
   let+ ((stream, locations), Command.ComputedHash handle) = Command.commit_and_perform stream locations command_write in
   let command_read: Command.t =
-    {kind = Command.READ; timestamp = 10.0; hash = handle; content = ""; filename = "user"; references = []} in
+    {kind = Command.READ; timestamp = 10.0; hash = handle; content = ""; filename = "schema~user"; references = []} in
   let+ ((stream, locations), Command.Read content) = Command.commit_and_perform stream locations command_read in
   let+ user_relation =
     Result.map_error (fun _ -> "Failed to deserialize relation from binary format.")
