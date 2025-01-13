@@ -177,8 +177,7 @@ module Executor = struct
     let physical_locations = List.map (fun hash -> StringMap.find hash locations) location_hashes in
     (* Terrible! Here I read everything opening a new IO every time. We should be able to read with only one call, but changing the offset every time *)
     let content = List.map (fun ({offset; size; _}: Location.t) -> match FS.read FS.Storage offset size with | Ok x -> x | Error err -> failwith err) physical_locations
-    in (*Bytes.concat Bytes.empty @@*)
-         List.rev content
+    in List.rev content
 end
 
 module Startup = struct
@@ -231,7 +230,7 @@ module Command = struct
 
   type return =
     | ComputedHash of string
-    | Read of bytes list
+    | Read of Protocol.relation list
     | Nothing
   
   (** TODO: This does not write atomically. If the system crashes while it attempts to write, it will corrupt.
@@ -252,9 +251,19 @@ module Command = struct
          | None -> Ok ((updated_stream, locations), Nothing)
          end
       | READ ->
-         let content = Executor.read (List.hd stream) locations ~filename:command.filename in
+         let ({files; _}: Executor.commit) = List.hd stream in
+         let attributes =
+           Executor.StringMap.filter_map (fun attr_name _ ->
+               print_endline attr_name;
+               if String.starts_with ~prefix:(command.filename ^ "/") attr_name then Some attr_name else None) files
+           |> Executor.StringMap.to_list
+           |> List.map fst in
+         let relation =
+           List.map (fun attr ->
+               let content = Executor.read (List.hd stream) locations ~filename:attr in
+               ({attribute_name = attr; attribute_type = "string"; tuples = List.map Bytes.to_string content}: Protocol.relation)) (attributes) in
          (* print_string "CONTENT: "; *)
          (* print_endline @@ Bytes.to_string content; *)
-         Ok ((stream, locations), Read content)
+         Ok ((stream, locations), Read relation)
       | _ -> Error "Unimplemented method"
 end

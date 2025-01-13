@@ -22,7 +22,7 @@ let client_read sock maxlen =
                   then Lwt.return acc
                   else _read sock acc in
   _read sock String.empty
-  >>= fun _ -> match Relation.write_and_retrieve() with | Ok results -> return results | Error err -> return err
+  >>= fun _ -> match Relation.write_and_retrieve_test() with | Ok results -> return results | Error err -> return err
 
 let rec socket_read sock =
   (* (Int32.of_int (String.length results))) *)

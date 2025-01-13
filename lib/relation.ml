@@ -1,18 +1,4 @@
-
-
-module Protocol = struct
-  open Protocol_conv_xml
-  open Sexplib0.Sexp_conv
-  type tuple =
-    string list [@@deriving sexp, protocol ~driver:(module Xml_light)]
-  type relation =
-    { attribute_name: string;
-      attribute_type: string;
-      tuples: tuple }
-      [@@deriving sexp, protocol ~driver:(module Xml_light)]
-  type t = relation list [@@deriving sexp, protocol ~driver:(module Xml_light)]
-end
-
+(*
 let write_and_retrieve() =
   let open Disk in
   let stream: Executor.history = [{state = Executor._EMPTY_SHA_HASH_; files = Executor.StringMap.empty}] in
@@ -48,3 +34,24 @@ let write_and_retrieve() =
   Ok (Xml.to_string (Protocol.to_xml_light relation_result))
     (* (Sexp.to_string (Protocol.sexp_of_t )) *)
     [@@warning "-8"] (* Suppress pattern match incomplete warnings *)
+*)
+
+let write_and_retrieve_test() =
+  let open Disk in
+  let stream: Executor.history = [{state = Executor._EMPTY_SHA_HASH_; files = Executor.StringMap.empty}] in
+  let locations: Executor.locations = Executor.StringMap.empty in
+  let open Extensions.Result in
+  let command_write1: Command.t =
+    {kind = Command.WRITE; timestamp = 10.0; hash = ""; content = "Daisy"; filename = "user/first-name"; references = []} in
+  let+ ((stream, locations), Command.ComputedHash _) = Command.commit_and_perform stream locations command_write1 in
+  let command_write2: Command.t =
+    {kind = Command.WRITE; timestamp = 10.0; hash = ""; content = "Blossom"; filename = "user/last-name"; references = []} in
+  let+ ((stream, locations), Command.ComputedHash _) = Command.commit_and_perform stream locations command_write2 in
+  let command_read1: Command.t = {kind = Command.READ; timestamp = 0.0; hash = ""; content = ""; filename = "user"; references = []} in
+  let+ (_, Command.Read relation) = Command.commit_and_perform stream locations command_read1 in
+  (* let relation_result: Protocol.relation list = *)
+    (* [{attribute_name = "user/first-name"; attribute_type = "string"; tuples = List.map Bytes.to_string first_name}; *)
+     (* {attribute_name = "user/last-name"; attribute_type = "string"; tuples = List.map Bytes.to_string last_name}] in *)
+  Ok (Xml.to_string (Protocol.to_xml_light relation))
+    (* (Sexp.to_string (Protocol.sexp_of_t )) *)
+    [@@warning "-8-26"] (* Suppress pattern match incomplete warnings *)
