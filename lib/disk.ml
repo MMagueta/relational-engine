@@ -80,6 +80,7 @@ end
 
 module Executor = struct
   module StringMap = Map.Make (String)
+  module IntMap = Map.Make (Int64)
   module FS = FileSystem (DevelopmentConfiguration)
 
   module Location = struct
@@ -90,8 +91,8 @@ module Executor = struct
     type t = { values : string list; hash : string } [@@deriving show]
     type history = t list [@@deriving show]
   end
-
-  type commit = { state : string; files : Hashes.history StringMap.t }
+  
+  type commit = { state : string; files : Hashes.history StringMap.t; references: string list IntMap.t }
   type history = commit list
   type locations = Location.t StringMap.t
 
@@ -119,7 +120,7 @@ module Executor = struct
     in
     Interop.Merkle.merkle_generate_root all_hashes
 
-  let write ({ files; _ } as commit : commit) (locations : locations) ~filename
+  let write ({ files; references; _ } as commit : commit) (locations : locations) ~filename ~entity_id
       ?hash_to_replace (content : Bytes.t) =
     let files = init_file files filename in
     let computed_hash : string = Interop.Sha256.compute_hash content in
@@ -153,7 +154,7 @@ module Executor = struct
                 ({ size; offset; hash = computed_hash } : Location.t)
                 locations
             in
-            let commit = { state = compose_new_state files; files } in
+            let commit = { state = compose_new_state files; files; references } in
             Ok ((commit, locations), Some computed_hash)
         | Some hash_to_replace ->
             let update_fun = function
@@ -184,7 +185,7 @@ module Executor = struct
                 ({ size; offset; hash = computed_hash } : Location.t)
                 locations
             in
-            let commit = { state = compose_new_state files; files } in
+            let commit = { state = compose_new_state files; files; references } in
             Ok ((commit, locations), Some computed_hash))
     | Some _ -> (
         match hash_to_replace with
@@ -209,7 +210,7 @@ module Executor = struct
                   Some [ { values = [ computed_hash ]; hash = computed_hash } ]
             in
             let files = StringMap.update filename update_fun files in
-            let commit = { state = compose_new_state files; files } in
+            let commit = { state = compose_new_state files; files; references } in
             Ok ((commit, locations), Some computed_hash)
         | None -> Ok ((commit, locations), None))
 
@@ -262,34 +263,34 @@ module Command = struct
     timestamp : float;
     hash : string;
     filename : string;
-    references : string list;
+    entity_id : Int64.t;
     (* branch must be added here later *)
     content : string;
   }
 
   let command_encoding =
     conv
-      (fun { kind; timestamp; hash; filename; references; content } ->
-        (kind, timestamp, hash, filename, references, content))
-      (fun (kind, timestamp, hash, filename, references, content) ->
-        { kind; timestamp; hash; filename; references; content })
+      (fun { kind; timestamp; hash; filename; entity_id; content } ->
+        (kind, timestamp, hash, filename, entity_id, content))
+      (fun (kind, timestamp, hash, filename, entity_id, content) ->
+        { kind; timestamp; hash; filename; entity_id; content })
       Data_encoding.(
-        tup6 command_kind_encoding float string string (list string) string)
+        tup6 command_kind_encoding float string string int64 string)
 
   let parse_command ~data =
     let contract_encoding =
       Data_encoding.(
-        tup5 command_kind_encoding string string (list string) string)
+        tup5 command_kind_encoding string string int64 string)
     in
     match Binary.of_bytes_opt contract_encoding data with
-    | Some (kind, hash, filename, references, content) ->
+    | Some (kind, hash, filename, entity_id, content) ->
         Ok
           {
             kind;
             timestamp = Unix.time ();
             hash;
             filename;
-            references;
+            entity_id;
             content;
           }
     | None -> Error "Failed to parse command"

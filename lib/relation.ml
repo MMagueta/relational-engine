@@ -133,9 +133,12 @@ let write_and_retrieve () =
 *)
 
 let write_and_retrieve_test () =
+  let entity_id_global_counter: Int64.t ref = ref 1L in
   let open Disk in
   let stream : Executor.history =
-    [ { state = Executor._EMPTY_SHA_HASH_; files = Executor.StringMap.empty } ]
+    [ { state = Executor._EMPTY_SHA_HASH_;
+        files = Executor.StringMap.empty;
+        references = Executor.IntMap.empty;} ]
   in
   let locations : Executor.locations = Executor.StringMap.empty in
   let open Extensions.Result in
@@ -146,7 +149,7 @@ let write_and_retrieve_test () =
       hash = "";
       content = "Daisy";
       filename = "user/first-name";
-      references = [];
+      entity_id = !entity_id_global_counter;
     }
   in
   let+ (stream, locations), Command.ComputedHash _ =
@@ -159,7 +162,7 @@ let write_and_retrieve_test () =
       hash = "";
       content = "Blossom";
       filename = "user/last-name";
-      references = [];
+      entity_id = !entity_id_global_counter;
     }
   in
   let+ (stream, locations), Command.ComputedHash _ =
@@ -172,7 +175,7 @@ let write_and_retrieve_test () =
       hash = "";
       content = "";
       filename = "user";
-      references = [];
+      entity_id = 0L;
     }
   in
   let+ _, Command.Read relation =
@@ -181,7 +184,7 @@ let write_and_retrieve_test () =
   (* let relation_result: Protocol.relation list = *)
   (* [{attribute_name = "user/first-name"; attribute_type = "string"; tuples = List.map Bytes.to_string first_name}; *)
   (* {attribute_name = "user/last-name"; attribute_type = "string"; tuples = List.map Bytes.to_string last_name}] in *)
-  Ok (Xml.to_string (Protocol.to_xml_light relation))
-(* (Sexp.to_string (Protocol.sexp_of_t )) *)
+  (* Ok (Xml.to_string (Protocol.to_xml_light relation)) *)
+  Ok (Sexplib0.Sexp.to_string (Protocol.sexp_of_t relation))
 [@@warning "-8-26"]
 (* Suppress pattern match incomplete warnings *)
