@@ -5,7 +5,7 @@
   ;; (setq *mailbox* (json-read-from-string response))
   (setq *mailbox* response)
   (let ((response (process-get process :response)))
-    (message "Received: %s" response)    
+    (message "Received: %s" response)
     (delete-process process)))
 
 (setq relational-engine-address "localhost")

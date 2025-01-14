@@ -1,7 +1,15 @@
 (library
  (name relational_engine)
- (libraries ctypes ctypes-foreign data-encoding lwt lwt.unix lwt-exit ppx_protocol_conv_xml_light)
- (preprocess (pps ppx_deriving.show ppx_sexp_conv ppx_protocol_conv))
+ (libraries
+  ctypes
+  ctypes-foreign
+  data-encoding
+  lwt
+  lwt.unix
+  lwt-exit
+  ppx_protocol_conv_xml_light)
+ (preprocess
+  (pps ppx_deriving.show ppx_sexp_conv ppx_protocol_conv))
  ;; (c_library_flags -lssl -lcrypto -L %{env:LIBRESSL_LIB_PATH=})
  ;; (foreign_stubs
  ;;  (language cxx)
