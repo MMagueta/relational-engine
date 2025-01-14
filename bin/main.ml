@@ -1,7 +1,7 @@
-open Relational_engine
-
 let () =
-  begin
-    (* print_endline @@ Interop.Merkle.merkle_generate_root [Disk.Executor._EMPTY_SHA_HASH_] *)
-    Interop.Merkle.register_to_merkle Disk.Executor._EMPTY_SHA_HASH_;
-  end
+  (* let response = *)
+  (* Relational_engine.Relation.write_and_retrieve() *)
+  (* in match response with *)
+  (* | Ok response -> print_endline response *)
+  (* | Error err -> print_endline err; *)
+  Relational_engine.Server.start ()

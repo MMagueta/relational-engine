@@ -26,17 +26,26 @@
         # Legacy packages that have not been converted to flakes
         legacyPackages = nixpkgs.legacyPackages.${system};
         # OCaml packages available on nixpkgs
-        ocamlPackages = legacyPackages.ocamlPackages;
         # Library functions from nixpkgs
         lib = legacyPackages.lib;
+        ocamlPackages = legacyPackages.ocamlPackages;
         merklecpp = legacyPackages.callPackage ./deps/merklecpp.nix { };
         libressl = legacyPackages.callPackage ./deps/libressl.nix { };
+        ppx_protocol_conv =
+          legacyPackages.callPackage ./deps/ppx_protocol_conv.nix {
+            lib = legacyPackages.lib;
+            fetchFromGitHub = legacyPackages.fetchFromGitHub;
+            ocamlPackages = ocamlPackages; };
+        ppx_protocol_conv_xml_light =
+          legacyPackages.callPackage ./deps/ppx_protocol_conv_xml_light.nix {
+            lib = legacyPackages.lib;
+            ppx_protocol_conv = ppx_protocol_conv;
+            fetchFromGitHub = legacyPackages.fetchFromGitHub;
+            ocamlPackages = ocamlPackages; };
         librelational_engine =
           legacyPackages.callPackage ./deps/relational_engine_lib.nix {
             libressl = libressl;
-            merklecpp = merklecpp;
-          };
-
+            merklecpp = merklecpp; };
         # Filtered sources (prevents unecessary rebuilds)
         sources = {
           ocaml = nix-filter.lib {
@@ -89,12 +98,18 @@
 
             nativeInputs = [ ];
 
-            buildInputs = with ocamlPackages; [
+            buildInputs = [ ppx_protocol_conv_xml_light
+                            ppx_protocol_conv ]
+            ++ (with ocamlPackages; [
               ctypes
               ctypes-foreign
               data-encoding
               ppx_inline_test
-            ];
+              ppx_deriving
+              ppx_sexp_conv
+              lwt
+              lwt-exit
+            ]);
 
             strictDeps = true;
 
@@ -164,6 +179,12 @@
               ocamlPackages.ocaml
               legacyPackages.ocamlformat
               ocamlPackages.ppx_inline_test
+              ocamlPackages.ppx_deriving
+              ocamlPackages.ppx_sexp_conv
+              ocamlPackages.lwt
+              ocamlPackages.lwt-exit
+              ppx_protocol_conv
+              ppx_protocol_conv_xml_light
             ];
           } ''
             echo "checking dune and ocaml formatting"
@@ -233,7 +254,7 @@
               legacyPackages.nixpkgs-fmt
               legacyPackages.ocamlformat
               # For `dune build --watch ...`
-              legacyPackages.fswatch
+              # legacyPackages.fswatch
               # For `dune build @doc`
               ocamlPackages.odoc
               # OCaml editor support
@@ -248,10 +269,17 @@
               ocamlPackages.ctypes-foreign
               ocamlPackages.data-encoding
               ocamlPackages.ppx_inline_test
+              ocamlPackages.ppx_deriving
+              ocamlPackages.ppx_sexp_conv
               legacyPackages.cmake
               legacyPackages.gcc
-              legacyPackages.nixfmt-classic
+              # legacyPackages.nixfmt-classic
+              ocamlPackages.lwt
+              ocamlPackages.lwt-exit
+              ppx_protocol_conv
+              ppx_protocol_conv_xml_light
             ];
+
 
             shellHook = ''
               echo MERKLECPP_INCLUDE_PATH=$MERKLECPP_INCLUDE_PATH
