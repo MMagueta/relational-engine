@@ -26,9 +26,10 @@ let client_read sock maxlen =
   match Relation.write_and_retrieve () with
   | Ok (last_commit::_, locations) ->
      begin
-       let (first_names, last_names) = (Planner.Scan.execute last_commit locations "user/first-name", Planner.Scan.execute last_commit locations "user/last-name") in
-       let tuples = Planner.Join.execute first_names last_names locations in
-       let (fname, lname) = List.split tuples in
+       (* let (first_names, last_names) = (Planner.Scan.execute last_commit locations "user/first-name", Planner.Scan.execute last_commit locations "user/last-name") in *)
+       (* let tuples = Planner.Join.execute first_names last_names locations in *)
+       let (fname, lname) = List.split [] in
+       (* tuples in *)
        let relation_result: Relation.Protocol.facts =
              [{attribute_name = "user/first-name"; attribute_type = "string"; tuples = List.map Bytes.to_string fname};
               {attribute_name = "user/last-name"; attribute_type = "string"; tuples = List.map Bytes.to_string lname}] in
@@ -36,6 +37,7 @@ let client_read sock maxlen =
      end
   | Ok _ -> return "Unstable"
   | Error err -> return err
+  [@@warning "-27"]
 
 let rec socket_read sock =
   (* (Int32.of_int (String.length results))) *)

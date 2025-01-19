@@ -1,5 +1,5 @@
 module Scan = struct
-  open Disk
+  (* open Disk
   let execute commit locations (entity: string) =
     let binary = Executor.read commit locations ~filename:("schema~" ^ entity) in
     let relation =
@@ -11,11 +11,11 @@ module Scan = struct
          let attrs = List.map (fun (a: Schema.Protocol.attribute) -> relation.name ^ "/" ^ a.name) relation.attributes in
          Executor.read commit locations ~filename:("schema~" ^ entity)
        end
-    | Error err -> failwith err
+    | Error err -> failwith err *)
 end
 
 module Join = struct
-  open Disk
+  (* open Disk
   let execute (left_attributes: bytes list) (right_attributes: bytes list) locations =
     (* Redundant operations that are already in the locations, but this is easier to implement now *)
     (* Fix this when we persist the indexes *)
@@ -26,8 +26,7 @@ module Join = struct
     let indexes =
       List.filter_map (fun (lindex, lhash) -> Option.map (fun (rindex, rhash, _) -> lindex, rindex, lhash, rhash)
                                               @@ List.find_opt (fun (_rindex, _rhash, references) -> List.exists ((=) lhash) references) references_locations_right) left_computed_hashes
-    in List.map (fun (lindex, rindex, _, _) -> List.nth left_attributes lindex, List.nth right_attributes rindex) indexes
-  
+    in List.map (fun (lindex, rindex, _, _) -> List.nth left_attributes lindex, List.nth right_attributes rindex) indexes *)
 end
 
 module Filter = struct

@@ -77,8 +77,7 @@ module Executor = struct
     type t =
       { offset: int64;
         size: int;
-        hash: string;
-        references: string list }
+        hash: string }
     [@@deriving show]
   end
   module Hashes = struct
@@ -110,7 +109,7 @@ module Executor = struct
                             List.map (fun ({hash; _}: Hashes.t) -> hash) history) history
     in Interop.Merkle.merkle_generate_root all_hashes
   
-  let write ({files;_} as commit: commit) (locations: locations) ~filename ?hash_to_replace references (content: Bytes.t) =
+  let write ({files;_} as commit: commit) (locations: locations) ~filename ?hash_to_replace (content: Bytes.t) =
     let files = init_file files filename in
     let computed_hash: string = Interop.Sha256.compute_hash content in
     match StringMap.find_opt computed_hash locations with
@@ -133,7 +132,7 @@ module Executor = struct
             let open Extensions.Result in
             let+ (size, offset) = FS.append Storage content in
             let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
-            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash; references = references}: Location.t) locations in
+            let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
             let commit = {state = compose_new_state files; files}
             in Ok ((commit, locations), Some computed_hash)
           end
@@ -150,7 +149,7 @@ module Executor = struct
            let open Extensions.Result in
            let+ (size, offset) = FS.append Storage content in
            let () = print_endline @@ "OFFSET: " ^ (Int64.to_string offset) in
-           let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash; references = references}: Location.t) locations in
+           let locations = StringMap.add computed_hash ({size; offset; hash = computed_hash}: Location.t) locations in
            let commit = {state = compose_new_state files; files}
            in Ok ((commit, locations), Some computed_hash)
         end
@@ -165,15 +164,15 @@ module Executor = struct
                 Some (new_entry::file_hashes)
              | None -> Some [{values = [computed_hash]; hash = computed_hash}]
            in
-           let location_update_fun = function
+           (* let location_update_fun = function
              | Some (location: Location.t) ->
                 Some { location with references = references@location.references }
              | None -> None (* This case is a bit weird to exist. Can we ever already add and get nothing? Refactor with the location passed on the `Some _` already *)
-           in
+           in *)
            let files = StringMap.update filename update_fun files in
            let commit = {state = compose_new_state files; files} in
-           let locations = StringMap.update computed_hash location_update_fun locations
-           in Ok ((commit, locations), Some computed_hash)
+           (* let locations = StringMap.update computed_hash location_update_fun locations in *)
+           Ok ((commit, locations), Some computed_hash)
         | None ->
            Ok ((commit, locations), None)
         end
@@ -186,6 +185,9 @@ module Executor = struct
     let content = List.map (fun ({offset; size; _}: Location.t) -> match FS.read FS.Storage offset size with | Ok x -> x | Error err -> failwith err) physical_locations
     in (*Bytes.concat Bytes.empty @@*)
          List.rev content
+  let read_location ~hash (locations: locations) =
+    let ({offset; size; _}: Location.t) = StringMap.find hash locations
+    in match FS.read FS.Storage offset size with | Ok x -> x | Error err -> failwith err
 end
 
 module Startup = struct
@@ -226,29 +228,29 @@ module Command = struct
       timestamp: float;
       hash: string;
       filename: string;
-      references: string list;
       (* branch must be added here later *)
       content: string }
   let command_encoding =
     conv 
-      (fun {kind; timestamp; hash; filename; references; content} -> (kind, timestamp, hash, filename, references, content))
-      (fun (kind, timestamp, hash, filename, references, content) -> {kind; timestamp; hash; filename; references; content})
-      Data_encoding.(tup6 command_kind_encoding float string string (list string) string)
+      (fun {kind; timestamp; hash; filename; content} -> (kind, timestamp, hash, filename, content))
+      (fun (kind, timestamp, hash, filename, content) -> {kind; timestamp; hash; filename; content})
+      Data_encoding.(tup5 command_kind_encoding float string string string)
   
   let parse_command ~data =
-    let contract_encoding = Data_encoding.(tup5 command_kind_encoding string string (list string) string) in
+    let contract_encoding = Data_encoding.(tup4 command_kind_encoding string string string) in
     match Binary.of_bytes_opt contract_encoding data with
-    | Some (kind, hash, filename, references, content) -> Ok {kind; timestamp = Unix.time(); hash; filename; references; content}
+    | Some (kind, hash, filename, content) -> Ok {kind; timestamp = Unix.time(); hash; filename; content}
     | None -> Error "Failed to parse command"
 
   type return =
     | ComputedHash of string
-    | Read of bytes list
+    | Read of (string * bytes list) list
     | Nothing
+    [@@deriving show]
   
   (** TODO: This does not write atomically. If the system crashes while it attempts to write, it will corrupt.
      Solve this with a temporary file and move later. *)
-  let commit_and_perform (stream: Executor.history) (locations: Executor.locations) command =
+  let commit_and_perform (stream: Executor.history) (locations: Executor.locations) references command =
       let open Extensions.Result in
       let+ serialized_command =
         Result.map_error (fun _ -> "Failed to serialize command to binary format.")
@@ -256,17 +258,18 @@ module Command = struct
       let+ _ = FS.append FS.Transaction serialized_command in
       match command.kind with
       | WRITE -> begin
-         let open Extensions.Result in
-         let+ ((commit, locations), computed_hash_handle) = Executor.write (List.hd stream) locations ~filename:command.filename command.references @@ Bytes.of_string command.content in
-         let updated_stream = commit::stream in
-         match computed_hash_handle with
-         | Some computed_hash_handle -> Ok ((updated_stream, locations), ComputedHash computed_hash_handle)
-         | None -> Ok ((updated_stream, locations), Nothing)
-         end
+        let open Extensions.Result in
+        let+ ((commit, locations), computed_hash_handle) = Executor.write (List.hd stream) locations ~filename:command.filename @@ Bytes.of_string command.content in
+        let updated_stream = commit::stream in
+        match computed_hash_handle with
+        | Some computed_hash_handle -> Ok ((updated_stream, locations), ComputedHash computed_hash_handle)
+        | None -> Ok ((updated_stream, locations), Nothing)
+        end
       | READ ->
-         let content = Executor.read (List.hd stream) locations ~filename:command.filename in
-         (* print_string "CONTENT: "; *)
-         (* print_endline @@ Bytes.to_string content; *)
-         Ok ((stream, locations), Read content)
+        let entities: string list Executor.StringMap.t = Executor.StringMap.find command.filename references in
+        let content = Executor.StringMap.fold (fun key hashes acc -> (key,List.map (fun location -> Executor.read_location ~hash:location locations) hashes)::acc) entities [] in
+        (* print_string "CONTENT: "; *)
+        (* print_endline @@ Bytes.to_string content; *)
+        Ok ((stream, locations), Read content)
       | _ -> Error "Unimplemented method"
 end
