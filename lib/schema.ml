@@ -1,33 +1,33 @@
 module Protocol = struct
   open Data_encoding
-  type attribute =
-    { name: string;
-      attr_type: string }
-  type relation =
-    { name: string;
-      attributes: attribute list }
+
+  type attribute = { name : string; attr_type : string }
+  type relation = { name : string; attributes : attribute list }
+
   let attribute_encoding =
-    conv 
-      (fun {name; attr_type} -> (name, attr_type))
-      (fun (name, attr_type) -> {name; attr_type})
+    conv
+      (fun { name; attr_type } -> (name, attr_type))
+      (fun (name, attr_type) -> { name; attr_type })
       Data_encoding.(tup2 string string)
-  
+
   let parse_attribute ~data =
     let contract_encoding = Data_encoding.(tup2 string string) in
     match Binary.of_bytes_opt contract_encoding data with
-    | Some (name, attr_type) -> Ok {name; attr_type}
+    | Some (name, attr_type) -> Ok { name; attr_type }
     | None -> Error "Failed to parse attribute"
-  
+
   let relation_encoding =
-    conv 
-      (fun {name; attributes} -> (name, attributes))
-      (fun (name, attributes) -> {name; attributes})
+    conv
+      (fun { name; attributes } -> (name, attributes))
+      (fun (name, attributes) -> { name; attributes })
       Data_encoding.(tup2 string (list attribute_encoding))
-  
+
   let parse_relation ~data =
-    let contract_encoding = Data_encoding.(tup2 string (list attribute_encoding)) in
+    let contract_encoding =
+      Data_encoding.(tup2 string (list attribute_encoding))
+    in
     match Binary.of_bytes_opt contract_encoding data with
-    | Some (name, attributes) -> Ok {name; attributes}
+    | Some (name, attributes) -> Ok { name; attributes }
     | None -> Error "Failed to parse relation"
 end
 
