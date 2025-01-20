@@ -278,6 +278,7 @@
               ocamlPackages.lwt-exit
               ppx_protocol_conv
               ppx_protocol_conv_xml_light
+              ocamlPackages.earlybird
             ];
 
 

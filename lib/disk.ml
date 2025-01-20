@@ -72,6 +72,7 @@ end
 
 module Executor = struct
   module StringMap = Map.Make(String)
+  module IntMap = Map.Make(Int64)
   module FS = FileSystem(DevelopmentConfiguration)
   module Location = struct
     type t =
@@ -244,13 +245,15 @@ module Command = struct
 
   type return =
     | ComputedHash of string
-    | Read of (string * bytes list) list
+    | Read of (int64 * bytes list) list
     | Nothing
     [@@deriving show]
   
+  type references = string list Executor.IntMap.t Executor.StringMap.t
+
   (** TODO: This does not write atomically. If the system crashes while it attempts to write, it will corrupt.
      Solve this with a temporary file and move later. *)
-  let commit_and_perform (stream: Executor.history) (locations: Executor.locations) references command =
+  let commit_and_perform (stream: Executor.history) (locations: Executor.locations) (references: references) ~entity_id command =
       let open Extensions.Result in
       let+ serialized_command =
         Result.map_error (fun _ -> "Failed to serialize command to binary format.")
@@ -262,14 +265,31 @@ module Command = struct
         let+ ((commit, locations), computed_hash_handle) = Executor.write (List.hd stream) locations ~filename:command.filename @@ Bytes.of_string command.content in
         let updated_stream = commit::stream in
         match computed_hash_handle with
-        | Some computed_hash_handle -> Ok ((updated_stream, locations), ComputedHash computed_hash_handle)
-        | None -> Ok ((updated_stream, locations), Nothing)
+        | Some computed_hash_handle ->
+          print_endline "WRITE A";
+          let references =
+            let relation_name = List.hd @@ String.split_on_char '/' command.filename
+            in Executor.StringMap.update
+                  relation_name
+                  (function | Some entity ->
+          print_endline "WRITE SOME 1";
+                    Some (Executor.IntMap.update entity_id (function
+                                                    | Some locations ->
+          print_endline "WRITE SOME 2";
+                                                        Some (computed_hash_handle::locations)
+                                                    | None -> Some [computed_hash_handle]) entity)
+                            | None -> Some (Executor.IntMap.empty |> Executor.IntMap.add entity_id [computed_hash_handle])) references in
+          Ok ((updated_stream, locations, references), ComputedHash computed_hash_handle)
+        | None -> Ok ((updated_stream, locations, references), Nothing)
         end
       | READ ->
-        let entities: string list Executor.StringMap.t = Executor.StringMap.find command.filename references in
-        let content = Executor.StringMap.fold (fun key hashes acc -> (key,List.map (fun location -> Executor.read_location ~hash:location locations) hashes)::acc) entities [] in
+        let relation_name = List.hd @@ String.split_on_char '/' command.filename in
+        print_endline "READ";
+        print_endline relation_name;
+        let entities: string list Executor.IntMap.t = Executor.StringMap.find relation_name references in
+        let content = Executor.IntMap.fold (fun key hashes acc -> (key,List.map (fun location -> Executor.read_location ~hash:location locations) hashes)::acc) entities [] in
         (* print_string "CONTENT: "; *)
         (* print_endline @@ Bytes.to_string content; *)
-        Ok ((stream, locations), Read content)
+        Ok ((stream, locations, references), Read content)
       | _ -> Error "Unimplemented method"
 end
