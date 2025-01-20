@@ -32,7 +32,7 @@ let client_read sock maxlen =
       (* let tuples = Planner.Join.execute first_names last_names locations in *)
       let fname, lname = List.split [] in
       (* tuples in *)
-      let relation_result : Relation.Protocol.facts =
+      let relation_result : Protocol.facts =
         [
           {
             attribute_name = "user/first-name";
@@ -47,7 +47,7 @@ let client_read sock maxlen =
         ]
       in
       return
-      @@ Xml.to_string (Relation.Protocol.facts_to_xml_light relation_result)
+      @@ Xml.to_string (Protocol.facts_to_xml_light relation_result)
   | Error err -> return err
 [@@warning "-27"]
 

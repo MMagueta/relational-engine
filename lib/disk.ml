@@ -92,12 +92,21 @@ module Executor = struct
     type history = t list [@@deriving show]
   end
 
+  type relational_type = 
+  | Text
+  | Integer32
+  | Integer64
+  | Boolean
+  | DiscriminatedUnion of (string * relational_type option) list * string (* [("MemberA", None); ("MemberB", Some Integer32)], "NameOfDU" *)
+
+  type schema = (string * relational_type) list StringMap.t
   type references = string list IntMap.t StringMap.t
 
   type commit = {
     state : string;
     files : Hashes.history StringMap.t;
     references : references;
+    schema : schema
   }
 
   type history = commit list
@@ -127,7 +136,7 @@ module Executor = struct
     in
     Interop.Merkle.merkle_generate_root all_hashes
 
-  let write ({ files; references; _ } as commit : commit)
+  let write ({ files; references; schema; _ } as commit : commit)
       (locations : locations) ~filename ?hash_to_replace (content : Bytes.t) =
     let files = init_file files filename in
     let computed_hash : string = Interop.Sha256.compute_hash content in
@@ -162,7 +171,7 @@ module Executor = struct
                 locations
             in
             let commit =
-              { state = compose_new_state files; files; references }
+              { state = compose_new_state files; files; references; schema }
             in
             Ok ((commit, locations), Some computed_hash)
         | Some hash_to_replace ->
@@ -195,7 +204,7 @@ module Executor = struct
                 locations
             in
             let commit =
-              { state = compose_new_state files; files; references }
+              { state = compose_new_state files; files; references; schema }
             in
             Ok ((commit, locations), Some computed_hash))
     | Some _ -> (
@@ -227,7 +236,7 @@ module Executor = struct
                in *)
             let files = StringMap.update filename update_fun files in
             let commit =
-              { state = compose_new_state files; files; references }
+              { state = compose_new_state files; files; references; schema }
             in
             (* let locations = StringMap.update computed_hash location_update_fun locations in *)
             Ok ((commit, locations), Some computed_hash)
